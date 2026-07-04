@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Die Bridge laeuft ueber HTTP (kein HTTPS) im lokalen Netz / AP.
+         Android blockiert Cleartext-HTTP ab API 28 standardmaessig -> hier
+         generell erlauben, damit beliebige lokale IPs erreichbar sind. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
