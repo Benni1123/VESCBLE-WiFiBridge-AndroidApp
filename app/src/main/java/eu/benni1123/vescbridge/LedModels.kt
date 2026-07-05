@@ -2,6 +2,17 @@ package eu.benni1123.vescbridge
 
 import org.json.JSONObject
 
+// Hilfsfunktion um Booleans sowohl als echte JSON-Booleans (true/false) als auch
+// als Integers (1/0) zu lesen. Macht die API robuster gegen Firmware-Aenderungen.
+private fun JSONObject.optBool(key: String, fallback: Boolean): Boolean {
+    if (!has(key)) return fallback
+    return try {
+        getBoolean(key)
+    } catch (_: Exception) {
+        optInt(key, if (fallback) 1 else 0) != 0
+    }
+}
+
 // Einstellungen eines LED-Kanals (Spiegel der Bridge-Struktur).
 data class LedChannel(
     val pin: Int,
@@ -32,7 +43,7 @@ data class LedConfig(
                 LedChannel(
                     pin     = c.optInt("pin", 4),
                     count   = c.optInt("count", 30),
-                    synced  = c.optBoolean("synced", false),
+                    synced  = c.optBool("synced", false),
                     effect  = c.optInt("effect", 0),
                     r       = c.optInt("r", 0),
                     g       = c.optInt("g", 0),
@@ -41,7 +52,7 @@ data class LedConfig(
                     krspeed = c.optInt("krspeed", 30),
                     krwidth = c.optInt("krwidth", 3),
                     polhz   = c.optInt("polhz", 4),
-                    swapColors = c.optBoolean("swapcolors", false)
+                    swapColors = c.optBool("swapcolors", false)
                 )
             }
             return LedConfig(o.optInt("count", 1), list)

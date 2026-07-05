@@ -1,51 +1,53 @@
-# VESC Bridge – Android App
+# VESC Bridge Android App
 
-Native Android-App (Kotlin + Jetpack Compose) zur Steuerung der VESC BLE/WiFi Bridge
-über deren lokale HTTP-API. Mehrere Geräte speicherbar, schnelles Umschalten,
-Status-Anzeige und volle Mehrkanal-LED-Steuerung.
+A native Android companion application designed to monitor and configure VESC controllers through an ESP32-based BLE/WiFi Bridge. Built with Kotlin and Jetpack Compose.
 
-## Bauen / Installieren
+## Core Features
 
-1. **Android Studio** (aktuelle Version, z.B. Koala/Ladybug) öffnen.
-2. `File > Open` → diesen Ordner `VescBridgeApp` wählen.
-3. Android Studio lädt automatisch Gradle + Abhängigkeiten (Internet nötig).
-4. Handy per USB anschließen (USB-Debugging aktiv) oder Emulator starten.
-5. Auf den grünen ▶ "Run"-Button klicken → App wird gebaut und installiert.
+### 1. Live Telemetry & Status
+*   **Real-time Monitoring**: View essential VESC data including voltage, ERPM, FET temperatures, and motor temperatures.
+*   **Fault Detection**: Displays VESC fault codes and descriptive error strings.
+*   **Connection Diagnostics**: Monitors bridge uptime, free heap memory, WiFi signal strength (RSSI), and ESP32 system diagnostics (watchdog resets, loop times, and packet statistics).
 
-Alternativ per Kommandozeile (im Projektordner):
-```
+### 2. LED Control System (WS28XX)
+*   **Multi-Channel Management**: Supports up to 4 independent LED channels with configurable GPIO pins and pixel counts.
+*   **Animation Engine**: Built-in controls for various effects:
+    *   Solid Color, Knight Rider (KITT), Rainbow Wave, Breathing, Sparkle, Meteor Rain, and Hellfire.
+    *   Emergency lighting: EU Police and US Police (Red/Blue/White) with adjustable frequencies.
+*   **Synchronization**: Option to sync settings across all active channels for unified lighting effects.
+*   **Real-time Tuning**: Adjust color via an integrated color wheel, brightness, animation speed, and effect width/density on the fly.
+
+### 3. Smart Connectivity Logic
+*   **Intelligent Host Resolution**: Automatically searches for the bridge across multiple saved IP addresses and the default Access Point IP (192.168.9.1).
+*   **Auto-Connect**: Allows marking a "favorite" device to initiate connection automatically on app startup.
+*   **Access Point Fallback**: Automatically triggers a connection request to the bridge's internal Access Point if the home WiFi is unreachable or if the device is set to "AP Only" mode.
+*   **Network Pinning**: Uses Android's `ConnectivityManager` to bind the app's traffic to the bridge network even when the OS detects a lack of internet access.
+
+### 4. Remote Configuration
+*   **UART Settings**: Configure RX/TX pins and baud rate settings.
+*   **BLE Customization**: Change the BLE name (visible in VESC Tool) and set advertising modes (Always On, Off, or Auto-ON based on ERPM/Movement).
+*   **WiFi Management**: Manage a priority list of known WiFi networks (SSID/Password/Static IP configurations).
+*   **System Maintenance**: Remote reboot triggers, roaming threshold adjustments (RSSI-based switching), and auto-reboot timers.
+
+### 5. Integrated Update System
+*   **Bridge Firmware**: Check for and install ESP32 firmware updates directly from the app.
+*   **App Updates**: Built-in version checking against GitHub releases.
+*   **Smart Download**: The app automatically identifies a secondary internet-capable network (mobile data or home WiFi) to download updates while remaining connected to the bridge AP.
+
+## Technical Stack
+*   **Language**: Kotlin
+*   **UI**: Jetpack Compose with Material 3
+*   **Architecture**: MVVM (ViewModel, StateFlow)
+*   **Networking**: HttpURLConnection with specific Network Binding for IoT stability
+*   **Persistence**: Jetpack DataStore (Preferences) for device and setting storage
+
+## Requirements
+*   **Android**: Min SDK 32 (Android 12L) or higher.
+*   **Hardware**: Compatible ESP32 VESC Bridge firmware.
+
+## Build Instructions
+Standard Gradle build process:
+```bash
 ./gradlew assembleDebug
 ```
-Die fertige APK liegt dann unter:
-`app/build/outputs/apk/debug/app-debug.apk`
-(per `adb install` aufs Handy, oder die Datei aufs Handy kopieren und antippen).
-
-## Erste Schritte in der App
-
-1. Unten auf **"Geräte"** tippen → **+** → Name (z.B. "G30") eingeben.
-   - **Mehrere IPs** eintragen (Button "IP hinzufügen"): z.B. die Heimnetz-IP
-     `10.0.0.142` UND die AP-IP `192.168.9.1`. Die App pingt alle und nutzt
-     automatisch die erreichbare als Datenquelle.
-   - **AP-SSID + Passwort** (optional): der WLAN-Name und das Passwort des
-     Access Points der Bridge. Damit kann die App automatisch mit dem AP
-     verbinden, wenn das Handy in **keinem** WLAN ist (mobile Daten zählen nicht).
-2. Mehrere Geräte einfach mehrfach hinzufügen; oben über das Wechsel-Symbol umschalten.
-3. **Status**: Live-Telemetrie (BLE, VESC, WiFi, Uptime) + welche IP gerade genutzt wird.
-   **LED**: Mehrkanal-Steuerung.
-
-## Auto-Connect zum Access Point
-
-Wenn keine der hinterlegten IPs erreichbar ist UND das Handy in keinem WLAN
-hängt (nur mobile Daten oder gar nichts), verbindet die App automatisch mit dem
-AP der Bridge (SSID + Passwort müssen beim Gerät hinterlegt sein). Android zeigt
-dabei **einmal einen Systemdialog** ("Mit [SSID] verbinden?") — das ist von
-Android ab Version 10 so vorgeschrieben und lässt sich nicht umgehen. Nach dem
-Bestätigen läuft der App-Verkehr über den AP. Über "Vom AP trennen" (im Status)
-geht es zurück ins normale Netz.
-
-## Hinweise
-
-- Die App kommuniziert über **HTTP** (kein TLS) – das Handy muss im selben Netz
-  wie die Bridge sein (Heim-WLAN oder direkt mit dem AP der Bridge verbunden).
-- Cleartext-HTTP ist in der App bewusst erlaubt (siehe `network_security_config.xml`).
-- Mindest-Android: 8.0 (API 26).
+Ensure you have the latest Android SDK and Build Tools installed via Android Studio.

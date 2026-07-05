@@ -3,6 +3,17 @@ package eu.benni1123.vescbridge
 import org.json.JSONArray
 import org.json.JSONObject
 
+// Hilfsfunktion um Booleans sowohl als echte JSON-Booleans (true/false) als auch
+// als Integers (1/0) zu lesen. Macht die API robuster gegen Firmware-Aenderungen.
+private fun JSONObject.optBool(key: String, fallback: Boolean): Boolean {
+    if (!has(key)) return fallback
+    return try {
+        getBoolean(key)
+    } catch (_: Exception) {
+        optInt(key, if (fallback) 1 else 0) != 0
+    }
+}
+
 // Ein WLAN-Netz (Heimnetz-Zugangsdaten der Bridge).
 data class WifiNet(
     val ssid: String = "",
@@ -19,6 +30,7 @@ data class BridgeConfig(
     val bleName: String = "",
     val apSsid: String = "",
     val apPass: String = "",
+    val apMode: Int = 1,
     val port: Int = 65101,
     val vescPoll: Boolean = false,
     val apTimeout: Int = 0,
@@ -34,7 +46,6 @@ data class BridgeConfig(
     val autopollInterval: Int = 5,
     val bleMode: Int = 1,
     val bleAutoErpmOn: Int = 200,
-    val apWakeOnMove: Boolean = false,
     val bleAutoOffSec: Int = 120,
     val ledsEnabled: Boolean = false,
     val updateUrl: String = "",
@@ -51,7 +62,7 @@ data class BridgeConfig(
                     wifiList.add(WifiNet(
                         ssid = w.optString("ssid", ""),
                         pass = w.optString("pass", ""),
-                        static = w.optBoolean("static", false),
+                        static = w.optBool("static", false),
                         ip = w.optString("ip", ""),
                         gateway = w.optString("gateway", ""),
                         subnet = w.optString("subnet", ""),
@@ -63,24 +74,24 @@ data class BridgeConfig(
                 bleName = o.optString("ble_name", ""),
                 apSsid = o.optString("ap_ssid", ""),
                 apPass = o.optString("ap_pass", ""),
+                apMode = o.optInt("ap_mode", 1),
                 port = o.optInt("port", 65101),
-                vescPoll = o.optBoolean("vesc_poll", false),
+                vescPoll = o.optBool("vesc_poll", false),
                 apTimeout = o.optInt("ap_timeout", 0),
                 rxPin = o.optInt("rx_pin", 0),
                 txPin = o.optInt("tx_pin", 0),
-                autoreboot = o.optBoolean("autoreboot", false),
+                autoreboot = o.optBool("autoreboot", false),
                 autorebootTime = o.optInt("autoreboot_time", 0),
-                autorebootNoWifi = o.optBoolean("autoreboot_no_wifi", false),
-                roamEnabled = o.optBoolean("roam_enabled", false),
+                autorebootNoWifi = o.optBool("autoreboot_no_wifi", false),
+                roamEnabled = o.optBool("roam_enabled", false),
                 roamThreshold = o.optInt("roam_threshold", -75),
                 roamHysteresis = o.optInt("roam_hysteresis", 5),
-                autopollEnabled = o.optBoolean("autopoll_enabled", false),
+                autopollEnabled = o.optBool("autopoll_enabled", false),
                 autopollInterval = o.optInt("autopoll_interval", 5),
                 bleMode = if (o.has("ble_mode")) o.getInt("ble_mode") else if (o.has("bleMode")) o.getInt("bleMode") else 1,
                 bleAutoErpmOn = o.optInt("ble_auto_erpm_on", 200),
-                apWakeOnMove = o.optBoolean("ap_wake_on_move", false),
                 bleAutoOffSec = o.optInt("ble_auto_off_sec", 120),
-                ledsEnabled = o.optBoolean("leds_enabled", false),
+                ledsEnabled = o.optBool("leds_enabled", false),
                 updateUrl = o.optString("update_url", ""),
                 versionUrl = o.optString("version_url", ""),
                 wifi = wifiList
@@ -94,36 +105,38 @@ data class BridgeConfig(
         o.put("ble_name", bleName)
         o.put("ap_ssid", apSsid)
         o.put("ap_pass", apPass)
+        o.put("ap_mode", apMode)
         o.put("port", port)
-        o.put("vesc_poll", vescPoll)
+        // Booleans als 1/0 senden, da die Firmware-API auf Integers umgestellt wurde
+        // und der dortige Parser (indexOf) damit zuverlaessiger arbeitet.
+        o.put("vesc_poll", if (vescPoll) 1 else 0)
         o.put("ap_timeout", apTimeout)
         o.put("rx_pin", rxPin)
         o.put("tx_pin", txPin)
-        o.put("autoreboot", autoreboot)
+        o.put("autoreboot", if (autoreboot) 1 else 0)
         o.put("autoreboot_time", autorebootTime)
-        o.put("autoreboot_no_wifi", autorebootNoWifi)
-        o.put("roam_enabled", roamEnabled)
+        o.put("autoreboot_no_wifi", if (autorebootNoWifi) 1 else 0)
+        o.put("roam_enabled", if (roamEnabled) 1 else 0)
         o.put("roam_threshold", roamThreshold)
         o.put("roam_hysteresis", roamHysteresis)
-        o.put("autopoll_enabled", autopollEnabled)
+        o.put("autopoll_enabled", if (autopollEnabled) 1 else 0)
         o.put("autopoll_interval", autopollInterval)
         o.put("ble_mode", bleMode)
         o.put("ble_auto_erpm_on", bleAutoErpmOn)
-        o.put("ap_wake_on_move", apWakeOnMove)
         o.put("ble_auto_off_sec", bleAutoOffSec)
-        o.put("leds_enabled", ledsEnabled)
+        o.put("leds_enabled", if (ledsEnabled) 1 else 0)
         o.put("update_url", updateUrl)
         o.put("version_url", versionUrl)
         val arr = JSONArray()
         wifi.forEach { w ->
             arr.put(JSONObject().apply {
                 put("ssid", w.ssid); put("pass", w.pass)
-                put("static", w.static); put("ip", w.ip)
+                put("static", if (w.static) 1 else 0); put("ip", w.ip)
                 put("gateway", w.gateway); put("subnet", w.subnet); put("dns", w.dns)
             })
         }
         o.put("wifi", arr)
-        if (!reboot) o.put("noreboot", true)
+        if (!reboot) o.put("noreboot", 1)
         return o.toString()
     }
 }

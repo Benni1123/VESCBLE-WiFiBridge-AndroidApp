@@ -164,66 +164,67 @@ fun StatusScreen(vm: MainViewModel) {
                     InfoRow(stringResource(R.string.version_current), u.current)
                     if (u.serverError) {
                         Text(stringResource(R.string.update_server_unreachable), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                    } else if (u.latest.isNotEmpty()) {
-                        InfoRow(stringResource(R.string.version_new), u.latest)
-                        if (u.available || (u.latest.isNotEmpty() && u.current != u.latest)) {
-                            Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick = { showUpdateConfirm = true },
-                                enabled = !updateBusy && progress == null,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (updateBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                else Text(stringResource(R.string.install_update_now))
-                            }
-                        } else {
+                    } else {
+                        if (u.latest.isNotEmpty()) {
+                            InfoRow(stringResource(R.string.version_new), u.latest)
+                        }
+                        if (!u.available && (u.latest.isEmpty() || u.current == u.latest)) {
                             Text(stringResource(R.string.firmware_up_to_date), color = Color(0xFF4CAF50), fontSize = 12.sp)
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(
-                        onClick = { vm.checkForUpdate() },
-                        enabled = !updateBusy && progress == null,
-                        modifier = Modifier.align(Alignment.End)
-                    ) { Text(stringResource(R.string.check_for_updates), fontSize = 12.sp) }
+                    
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        if (u.available || (u.latest.isNotEmpty() && u.current != u.latest)) {
+                            TextButton(
+                                onClick = { showUpdateConfirm = true },
+                                enabled = !updateBusy && progress == null
+                            ) {
+                                if (updateBusy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                else Text(stringResource(R.string.install_update_now), fontSize = 12.sp)
+                            }
+                        }
+                        TextButton(
+                            onClick = { vm.checkForUpdate() },
+                            enabled = !updateBusy && progress == null
+                        ) { Text(stringResource(R.string.check_for_updates), fontSize = 12.sp) }
+                    }
                 }
             }
 
             SectionCard(stringResource(R.string.app_update)) {
                 val au = appUpdate
                 if (au != null) {
-                    InfoRow(stringResource(R.string.new_version_available), stringResource(R.string.version) + " ${au.latestVersionCode}")
-                    Spacer(Modifier.height(8.dp))
-                    val currentAppProgress = appProgress
-                    if (currentAppProgress != null) {
-                        Column {
-                            LinearProgressIndicator(
-                                progress = { currentAppProgress },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Text("%.0f%%".format(locale, currentAppProgress * 100), fontSize = 11.sp)
-                        }
-                    } else {
-                        Button(
-                            onClick = { vm.downloadAppUpdate() },
-                            enabled = !appBusy,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (appBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            else Text(stringResource(R.string.download_install_update))
-                        }
-                    }
+                    InfoRow(stringResource(R.string.version_new), au.latestVersionCode.toString())
+                } else if (!appBusy) {
+                    Text(stringResource(R.string.app_up_to_date), color = Color(0xFF4CAF50), fontSize = 12.sp)
                 } else {
-                    if (appBusy) {
-                        Text(stringResource(R.string.searching_app_updates), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                    } else {
-                        Text(stringResource(R.string.app_up_to_date), color = Color(0xFF4CAF50), fontSize = 12.sp)
+                    Text(stringResource(R.string.searching_app_updates), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                }
+
+                val currentAppProgress = appProgress
+                if (currentAppProgress != null) {
+                    Column(Modifier.padding(top = 8.dp)) {
+                        LinearProgressIndicator(
+                            progress = { currentAppProgress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("%.0f%%".format(locale, currentAppProgress * 100), fontSize = 11.sp)
                     }
-                    Spacer(Modifier.height(4.dp))
+                }
+                
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (au != null && currentAppProgress == null) {
+                        TextButton(
+                            onClick = { vm.downloadAppUpdate() },
+                            enabled = !appBusy
+                        ) {
+                            if (appBusy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            else Text(stringResource(R.string.download_install_update), fontSize = 12.sp)
+                        }
+                    }
                     TextButton(
                         onClick = { vm.checkAppUpdate() },
-                        enabled = !appBusy,
-                        modifier = Modifier.align(Alignment.End)
+                        enabled = !appBusy
                     ) { Text(stringResource(R.string.check_app_updates), fontSize = 12.sp) }
                 }
             }

@@ -80,8 +80,8 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
     var bleOffSec by remember(k) { mutableStateOf(config.bleAutoOffSec.toString()) }
     var apSsid  by remember(k) { mutableStateOf(config.apSsid) }
     var apPass  by remember(k) { mutableStateOf(config.apPass) }
+    var apMode  by remember(k) { mutableStateOf(config.apMode) }
     var apTimeout by remember(k) { mutableStateOf(config.apTimeout.toString()) }
-    var apWake  by remember(k) { mutableStateOf(config.apWakeOnMove) }
     var port    by remember(k) { mutableStateOf(config.port.toString()) }
     var rxPin   by remember(k) { mutableStateOf(config.rxPin.toString()) }
     var txPin   by remember(k) { mutableStateOf(config.txPin.toString()) }
@@ -124,8 +124,12 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
             CfgSection(stringResource(R.string.access_point_section)) {
                 CfgText(stringResource(R.string.ap_ssid_label), apSsid) { apSsid = it }
                 CfgPassword(stringResource(R.string.ap_password_label), apPass) { apPass = it }
-                CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
-                CfgSwitch(stringResource(R.string.ap_wake_on_move_label), apWake) { apWake = it }
+                CfgDropdown(stringResource(R.string.mode), apMode,
+                    listOf("", stringResource(R.string.ap_on), stringResource(R.string.ap_auto)),
+                    startIndex = 1) { apMode = it }
+                if (apMode == 2) {
+                    CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
+                }
             }
             CfgSection(stringResource(R.string.vesc_uart_section)) {
                 CfgNumber(stringResource(R.string.tcp_port), port) { port = it }
@@ -247,6 +251,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                 onClick = {
                     val newCfg = BridgeConfig(
                         bleName = bleName, apSsid = apSsid, apPass = apPass,
+                        apMode = apMode,
                         port = i(port, 65101), vescPoll = vescPoll, apTimeout = i(apTimeout, 0),
                         rxPin = i(rxPin, 0), txPin = i(txPin, 0),
                         autoreboot = autoreboot, autorebootTime = i(autorebootTime, 300),
@@ -255,7 +260,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                         roamHysteresis = i(roamHyst, 12),
                         autopollEnabled = autopollEn, autopollInterval = i(autopollInt, 5),
                         bleMode = bleMode, bleAutoErpmOn = i(bleErpmOn, 200),
-                        apWakeOnMove = apWake, bleAutoOffSec = i(bleOffSec, 120),
+                        bleAutoOffSec = i(bleOffSec, 120),
                         ledsEnabled = ledsEn, updateUrl = updateUrl, versionUrl = versionUrl,
                         wifi = wifiList.filter { it.ssid.isNotBlank() }.map { it.toWifiNet() }
                     )
@@ -332,7 +337,7 @@ private fun CfgSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 @Composable
-private fun CfgDropdown(label: String, value: Int, options: List<String>, onChange: (Int) -> Unit) {
+private fun CfgDropdown(label: String, value: Int, options: List<String>, startIndex: Int = 0, onChange: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
@@ -341,7 +346,9 @@ private fun CfgDropdown(label: String, value: Int, options: List<String>, onChan
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEachIndexed { i, opt ->
-                DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(i); expanded = false })
+                if (i >= startIndex && opt.isNotEmpty()) {
+                    DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(i); expanded = false })
+                }
             }
         }
     }

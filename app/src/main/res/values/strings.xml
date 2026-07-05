@@ -211,6 +211,8 @@
     <string name="ble_off">Off (no BLE)</string>
     <string name="ble_on">On (always advertise)</string>
     <string name="ble_auto">Auto (on when moving)</string>
+    <string name="ap_on">On (always advertise)</string>
+    <string name="ap_auto">Auto (on when moving / client)</string>
     <string name="solid_color">Solid Color</string>
     <string name="police_eu">Police Light (EU)</string>
     <string name="police_us_white">US Police (with white)</string>

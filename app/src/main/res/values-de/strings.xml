@@ -210,6 +210,8 @@
     <string name="ble_off">Aus (kein BLE)</string>
     <string name="ble_on">An (immer sichtbar)</string>
     <string name="ble_auto">Auto (an bei Bewegung)</string>
+    <string name="ap_on">An (immer sichtbar)</string>
+    <string name="ap_auto">Auto (an bei Bewegung / Client)</string>
     <string name="solid_color">Feste Farbe</string>
     <string name="police_eu">Blaulicht (EU)</string>
     <string name="police_us_white">US-Polizei (mit Weiß)</string>

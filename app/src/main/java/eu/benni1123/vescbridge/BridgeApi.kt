@@ -9,6 +9,17 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+// Hilfsfunktion um Booleans sowohl als echte JSON-Booleans (true/false) als auch
+// als Integers (1/0) zu lesen. Macht die API robuster gegen Firmware-Aenderungen.
+private fun JSONObject.optBool(key: String, fallback: Boolean): Boolean {
+    if (!has(key)) return fallback
+    return try {
+        getBoolean(key)
+    } catch (e: Exception) {
+        optInt(key, if (fallback) 1 else 0) != 0
+    }
+}
+
 // Antwort eines Status-Abrufs (/api/info), auf das Wesentliche reduziert.
 data class BridgeInfo(
     val mode: String,
@@ -94,15 +105,15 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 ssid          = o.optString("ssid", ""),
                 ip            = o.optString("ip", ""),
                 rssi          = if (o.has("rssi")) o.getInt("rssi") else -999,
-                bleConnected  = o.optBoolean("ble_connected", false),
+                bleConnected  = o.optBool("ble_connected", false),
                 bleName       = o.optString("ble_name", ""),
                 bleMac        = o.optString("ble_mac", ""),
-                wifiClientConnected = o.optBoolean("wifi_client_connected", o.optBoolean("wifi_sta_connected", false)),
-                apActive      = o.optBoolean("ap_active", false),
+                wifiClientConnected = o.optBool("wifi_client_connected", o.optBool("wifi_sta_connected", false)),
+                apActive      = o.optBool("ap_active", false),
                 apTimeoutRemaining = if (o.has("ap_timeout_remaining")) o.getInt("ap_timeout_remaining") else -1,
                 apIp          = o.optString("ap_ip", ""),
                 apClientIp    = o.optString("ap_client_ip", ""),
-                vescConnected = o.optBoolean("vesc_connected", false),
+                vescConnected = o.optBool("vesc_connected", false),
                 vescVoltage   = o.optDouble("vesc_voltage", 0.0),
                 vescErpm      = o.optLong("vesc_erpm", 0),
                 vescTempFet   = o.optDouble("vesc_temp_fet", 0.0),
@@ -115,7 +126,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 port          = if (o.has("port")) o.getInt("port") else -1,
                 rxPin         = if (o.has("rx_pin")) o.getInt("rx_pin") else -1,
                 txPin         = if (o.has("tx_pin")) o.getInt("tx_pin") else -1,
-                ledsEnabled   = o.optBoolean("leds_enabled", o.optBoolean("leds", false)),
+                ledsEnabled   = o.optBool("leds_enabled", o.optBool("leds", false)),
                 allIps        = ips.filter { it != "0.0.0.0" },
                 diagScans     = if (o.has("diag_scans")) o.getInt("diag_scans") else -1,
                 diagStaConn   = if (o.has("diag_sta_conn")) o.getInt("diag_sta_conn") else -1,
@@ -188,7 +199,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
             BridgeUpdateStatus(
                 current = o.optString("current", ""),
                 latest = o.optString("available", ""),
-                available = o.optBoolean("update_available", false)
+                available = o.optBool("update_available", false)
             )
         } catch (e: Exception) { BridgeUpdateStatus(serverError = true) }
     }
@@ -200,7 +211,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
             BridgeUpdateStatus(
                 current = o.optString("current", ""),
                 latest = o.optString("available", ""),
-                available = o.optBoolean("update_available", false)
+                available = o.optBool("update_available", false)
             )
         } catch (e: Exception) { BridgeUpdateStatus(serverError = true) }
     }

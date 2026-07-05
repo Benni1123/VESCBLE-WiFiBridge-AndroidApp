@@ -283,7 +283,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                                 android.util.Log.d("VescDebug", "Bridge found on home IP, releasing AP bind.")
                                 wifi.release()
                             }
-                            apTried = false
+                            if (reachable != "192.168.9.1") {
+                                apTried = false
+                            }
                         } else {
                             searchCycles++
                             // Wann versuchen wir den AP-Connect?
@@ -351,6 +353,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             _info.value = info
                             val wasOffline = _state.value != ConnState.Online
                             _state.value = ConnState.Online
+                            
+                            // Erst bei erfolgreichem Poll den AP-Versuch wieder freigeben
+                            apTried = false
 
                             checkSync(info, dev)
 
@@ -384,11 +389,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                             val threshold = if (isApHost) 5 else 3
                             if (consecutiveFails >= threshold) {
+                                android.util.Log.d("VescDebug", "Connection lost after $consecutiveFails fails. Resetting active host.")
                                 consecutiveFails = 0
                                 val oldHost = _activeHost.value
                                 _activeHost.value = null
                                 _state.value = ConnState.Searching
-                                apTried = false
                                 _config.value = null
                                 // Selbstheilung: evtl. haengende WiFi-Bindung loesen,
                                 // damit der naechste resolveHost frisch aufsetzt.
@@ -430,7 +435,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         if (hosts.isEmpty()) return@withContext null
-        val channel = Channel<String?>(hosts.size * 2)
+        val channel = Channel<String?>(hosts.size * 3)
 
         // Wir probieren drei Wege parallel:
         // 1. null: Der normale Systemweg (Heimnetz-WLAN / LTE)
@@ -448,7 +453,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         val api = BridgeApi("http://$h", net)
                         // Ping-Aufruf mit kurzem Timeout, um schnell alle durchzuprobieren
                         if (api.ping()) {
-                            android.util.Log.d("VescDebug", "Host $h is reachable (Net: ${if (net == null) "System" else "Bound"})")
+                            val netType = when(net) {
+                                null -> "System"
+                                bound -> "Bound"
+                                else -> "CurrentWiFi"
+                            }
+                            android.util.Log.d("VescDebug", "Host $h is reachable (Net: $netType)")
+                            
+                            // Bevorzugung: Wenn wir die AP-IP suchen, nehmen wir bevorzugt den "Bound" Weg.
+                            // Wenn der System-Weg antwortet, warten wir kurz, ob Bound auch kommt.
+                            if (h == "192.168.9.1" && net == null && bound != null) {
+                                delay(300)
+                            }
+                            
                             channel.send(h)
                         } else {
                             channel.send(null)
@@ -462,15 +479,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         var received = 0
         val totalExpected = hosts.size * nets.size
+        var result: String? = null
+        
         while (received < totalExpected) {
             val res = channel.receive()
             received++
             if (res != null) {
-                coroutineContext.cancelChildren()
-                return@withContext res
+                result = res
+                // Wenn es die AP-IP ist, wollen wir sichergehen, dass wir nicht nur
+                // eine "Zufallsverbindung" über das System-Netz haben, sondern
+                // idealerweise über das gebundene Netz.
+                break 
             }
         }
-        null
+        
+        if (result != null) {
+            coroutineContext.cancelChildren()
+        }
+        result
     }
 
     private fun tryApConnect(dev: Device) {
