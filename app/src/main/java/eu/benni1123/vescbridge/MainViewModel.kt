@@ -156,7 +156,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _selected.value = sel
                     // Falls sich verbindungsrelevante Eigenschaften (z.B. apOnly)
                     // geaendert haben, muessen wir evtl. neu verbinden.
-                    if (old.apOnly != sel.apOnly || old.hosts != sel.hosts) {
+                    // ABER: nur wenn wir nicht gerade stabil online sind.
+                    // Das verhindert Reconnect-Loops beim automatischen IP/Namens-Sync.
+                    val isConnectionRelevantChange = old.apOnly != sel.apOnly || old.hosts != sel.hosts
+                    if (isConnectionRelevantChange && _state.value != ConnState.Online) {
                         onDeviceChanged()
                     } else if (wasSyncNameOff && _info.value != null) {
                         // Wenn der Haken gerade erst aktiviert wurde: sofort synctesten
