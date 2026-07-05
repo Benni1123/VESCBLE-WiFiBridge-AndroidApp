@@ -67,7 +67,6 @@ fun ConfigScreen(vm: MainViewModel) {
 
 @Composable
 private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel) {
-    val progress by vm.rebootProgress.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -200,9 +199,9 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                                     },
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 )
-                                if (showScan && !scanning) {
+                                if (!scanning) {
                                     DropdownMenu(
-                                        expanded = showScan && nearby.isNotEmpty(),
+                                        expanded = nearby.isNotEmpty(),
                                         onDismissRequest = { showScan = false },
                                         modifier = Modifier.fillMaxWidth(0.8f)
                                     ) {

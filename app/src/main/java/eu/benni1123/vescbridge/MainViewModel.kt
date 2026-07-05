@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 // Verbindungszustand des aktiven Geraets fuer die UI.
 enum class ConnState { Searching, Online, ConnectingAp, Offline, Rebooting }
@@ -161,9 +162,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         // Wenn der Haken gerade erst aktiviert wurde: sofort synctesten
                         checkSync(_info.value!!, sel)
                     }
-                } else if (sel == null && old != null) {
-                    _selected.value = null
-                    onDeviceChanged()
                 }
             }
         }
@@ -172,7 +170,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ledThrottler.collect { path ->
                 api()?.post(path)
-                delay(250)
+                delay(250.milliseconds)
             }
         }
     }
@@ -236,7 +234,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         slowSyncJob?.cancel()
         slowSyncJob = viewModelScope.launch {
             while (true) {
-                delay(10000)
+                delay(10000.milliseconds)
                 if (_state.value == ConnState.Online) {
                     loadConfig()
                     loadLedConfig()
@@ -249,7 +247,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun restartPolling() {
         pollJob?.cancel()
-        if (wakeLock.isHeld) try { wakeLock.release() } catch (e: Exception) {}
+        if (wakeLock.isHeld) try { wakeLock.release() } catch (_: Exception) {}
 
         pollJob = viewModelScope.launch {
             try {
@@ -258,13 +256,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     val dev = _selected.value
                     if (dev == null) {
                         _state.value = ConnState.Offline
-                        delay(2000)
+                        delay(2000.milliseconds)
                         continue
                     }
 
                     // Waehrend ein AP-Connect laeuft: nicht eingreifen, kurz warten.
                     if (apConnecting) {
-                        delay(500)
+                        delay(500.milliseconds)
                         continue
                     }
 
@@ -304,7 +302,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                                 if (!wifi.isWifiEnabled()) {
                                     _showWifiPanel.emit(Unit)
                                     _state.value = ConnState.Offline
-                                    delay(5000)
+                                    delay(5000.milliseconds)
                                     continue
                                 }
                                 apTried = true
@@ -319,7 +317,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                                         wifi.release()
                                     }
                                 }
-                                delay(1000)
+                                delay(1000.milliseconds)
                                 continue
                             }
                         }
@@ -341,7 +339,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         _state.value = ConnState.Searching
                         consecutiveFails = 0
                         apTried = false
-                        delay(100)
+                        delay(100.milliseconds)
                         continue
                     }
 
@@ -368,7 +366,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             if (wasOffline || _config.value == null) {
                                 loadConfigSyncToDevice(dev)
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // NICHT sofort die Verbindung wegwerfen: ein einzelner
                             // Timeout ist normal. Erst nach MAX_FAILS_BEFORE_DROP
                             // aufeinanderfolgenden Fehlern wirklich neu verbinden.
@@ -387,7 +385,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                                 _state.value = ConnState.Searching
                             }
 
-                            val threshold = if (isApHost) 5 else 3
+                            val threshold = if (isApHost) 10 else 3
                             if (consecutiveFails >= threshold) {
                                 android.util.Log.d("VescDebug", "Connection lost after $consecutiveFails fails. Resetting active host.")
                                 consecutiveFails = 0
@@ -413,10 +411,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         1000L      // 1s Polling für alle Modi (stabil)
                     else
                         400L       // Problem/Erholung -> schnell nachfassen
-                    delay(nextDelayMs)
+                    delay(nextDelayMs.milliseconds)
                 }
             } finally {
-                if (wakeLock.isHeld) try { wakeLock.release() } catch (e: Exception) {}
+                if (wakeLock.isHeld) try { wakeLock.release() } catch (_: Exception) {}
             }
         }
     }
@@ -463,14 +461,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             // Bevorzugung: Wenn wir die AP-IP suchen, nehmen wir bevorzugt den "Bound" Weg.
                             // Wenn der System-Weg antwortet, warten wir kurz, ob Bound auch kommt.
                             if (h == "192.168.9.1" && net == null && bound != null) {
-                                delay(300)
+                                delay(300.milliseconds)
                             }
                             
                             channel.send(h)
                         } else {
                             channel.send(null)
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         channel.send(null)
                     }
                 }
@@ -510,10 +508,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         // mehrfach versuchen, die Bridge zu erreichen. Der Webserver
                         // auf dem ESP braucht manchmal 1-2 Sek nach WLAN-Connect.
                         var reachable: String? = null
-                        for (i in 1..3) {
-                            delay(1000)
+                        repeat(3) {
+                            delay(1000.milliseconds)
                             reachable = resolveHost(dev)
-                            if (reachable != null) break
+                            if (reachable != null) return@repeat
                         }
 
                         if (reachable != null) {
@@ -524,11 +522,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             // AP verbunden, aber Bridge auch nach Retries nicht erreichbar
                             wifi.release()
                             _state.value = ConnState.Offline
-                            delay(3000) // Etwas längere Pause nach Fehlschlag
+                            delay(3000.milliseconds) // Etwas längere Pause nach Fehlschlag
                         }
                     } else {
                         _state.value = ConnState.Offline
-                        delay(4000) // Pause, falls Android die Anfrage abgelehnt hat (z.B. Hintergrund)
+                        delay(4000.milliseconds) // Pause, falls Android die Anfrage abgelehnt hat (z.B. Hintergrund)
                     }
                 } finally {
                     apConnecting = false
@@ -547,7 +545,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             try { _info.value = a.fetchInfo(); _state.value = ConnState.Online }
-            catch (e: Exception) { _activeHost.value = null }
+            catch (_: Exception) { _activeHost.value = null }
         }
     }
 
@@ -621,7 +619,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
             for (i in 0..steps) {
                 _rebootProgress.value = i / 100f
-                delay(stepDelay)
+                delay(stepDelay.milliseconds)
             }
 
             _rebootProgress.value = null
@@ -638,8 +636,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _showWifiPanel = MutableSharedFlow<Unit>(replay = 0)
     val showWifiPanel: SharedFlow<Unit> = _showWifiPanel.asSharedFlow()
-
-    fun wifiPanelShown() { /* Nichts tun */ }
 
     fun getNearbySsids(): List<String> = wifi.getNearbySsids()
 
@@ -667,7 +663,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val cfg = BridgeConfig.parse(a.fetchConfig())
                 _config.value = cfg
             }
-            catch (e: Exception) { _config.value = null }
+            catch (_: Exception) { _config.value = null }
             finally { _configBusy.value = false }
         }
     }
@@ -698,7 +694,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         apPassword = cfg.apPass
                     ))
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
             } finally {
                 _configBusy.value = false
             }
@@ -711,7 +707,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val dev = _selected.value
             if (a == null || dev == null) { onResult(false); return@launch }
             _configBusy.value = true
-            val ok = try { a.postConfig(cfg.toJson(reboot)) } catch (e: Exception) { false }
+            val ok = try { a.postConfig(cfg.toJson(reboot)) } catch (_: Exception) { false }
 
             if (ok) {
                 val staticIps = cfg.wifi.filter { it.static && it.ip.isNotBlank() }.map { it.ip }
@@ -745,7 +741,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val a = api() ?: return@launch
             try { _ledConfig.value = LedConfig.parse(a.fetchLedConfig()) }
-            catch (e: Exception) { _ledConfig.value = null }
+            catch (_: Exception) { _ledConfig.value = null }
         }
     }
 
@@ -784,7 +780,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val a = api() ?: run { onResult(false); return@launch }
             _updateBusy.value = true
-            val ok = try { a.installUpdate() } catch (e: Exception) { false }
+            val ok = try { a.installUpdate() } catch (_: Exception) { false }
             if (ok) {
                 _updateStatus.value = null
                 prepareForReboot()
@@ -798,7 +794,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        if (wakeLock.isHeld) try { wakeLock.release() } catch (e: Exception) {}
+        if (wakeLock.isHeld) try { wakeLock.release() } catch (_: Exception) {}
         slowSyncJob?.cancel()
         wifi.release()
     }

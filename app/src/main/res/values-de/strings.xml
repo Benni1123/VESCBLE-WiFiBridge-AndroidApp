@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">🛴 VESC Bridge</string>
-    <string name="searching_ip">Suche erreichbare IP \u2026</string>
-    <string name="connecting_ap">Verbinde mit AP %1$s \u2026</string>
+    <string name="searching_ip">Suche erreichbare IP …</string>
+    <string name="connecting_ap">Verbinde mit AP %1$s …</string>
     <string name="not_reachable">Nicht erreichbar. Pr\u00fcfe IPs / WLAN.</string>
     <string name="dhcp_tip">Tipp: Da der ESP manchmal tr\u00e4ge beim DHCP ist, kann die Verbindung fehlschlagen und ein App Neustart w\u00e4re ratsam.</string>
     <string name="retry">Erneut versuchen</string>
@@ -37,7 +37,7 @@
     <string name="error">Fehler</string>
     <string name="error_id">Fehler-ID</string>
     <string name="firmware_update">Firmware-Update</string>
-    <string name="loading_update_status">Lade Update-Status \u2026</string>
+    <string name="loading_update_status">Lade Update-Status …</string>
     <string name="version_current">Version (aktuell)</string>
     <string name="update_server_unreachable">Update-Server nicht erreichbar</string>
     <string name="version_new">Version (neu)</string>
@@ -47,7 +47,7 @@
     <string name="app_update">App-Update</string>
     <string name="new_version_available">Neue Version verfügbar</string>
     <string name="download_install_update">Update herunterladen &amp; installieren</string>
-    <string name="searching_app_updates">Suche nach App-Updates \u2026</string>
+    <string name="searching_app_updates">Suche nach App-Updates …</string>
     <string name="app_up_to_date">Deine App ist aktuell.</string>
     <string name="check_app_updates">Nach App-Updates suchen</string>
     <string name="system">System</string>
@@ -87,7 +87,7 @@
 
     <!-- Config Screen Strings -->
     <string name="no_device_selected">Kein Ger\u00e4t ausgew\u00e4hlt.</string>
-    <string name="loading_config">Lade Konfiguration \u2026</string>
+    <string name="loading_config">Lade Konfiguration …</string>
     <string name="no_config_loaded">Keine Konfiguration geladen</string>
     <string name="load">Laden</string>
     <string name="ble_section">BLE</string>
@@ -144,8 +144,8 @@
     <string name="nav_config">Konfig</string>
     <string name="nav_devices">Ger\u00e4te</string>
     <string name="no_device">Kein Ger\u00e4t</string>
-    <string name="searching_dots">Suche...</string>
-    <string name="restarting_dots">Neustart...</string>
+    <string name="searching_dots">Suche…</string>
+    <string name="restarting_dots">Neustart…</string>
     <string name="switch_device">Wechseln</string>
     <string name="manage_devices">Verwalten</string>
 
@@ -173,7 +173,7 @@
     <string name="only_ap">nur AP</string>
 
     <!-- LED Screen Strings -->
-    <string name="loading_led_config">Lade LED-Konfiguration \u2026</string>
+    <string name="loading_led_config">Lade LED-Konfiguration …</string>
     <string name="led_enable_hint">(LED-Steuerung muss in der Bridge aktiviert sein)</string>
     <string name="active_channels">Aktive Kan\u00e4le: %1$d</string>
     <string name="synced_channels">Synchronisierte Kan\u00e4le (%1$d)</string>
@@ -202,7 +202,7 @@
     <string name="police_freq">Blaulicht-Frequenz (Hz)</string>
     <string name="flashes_per_burst">Blitze pro Burst</string>
     <string name="swap_colors_rb">Farben tauschen (Rot/Blau)</string>
-    <string name="kitt_tip">Tipp: Für den richtigen KITT-Effekt stell die Breite auf 1/3 der LED-Länge.</string>
+    <string name="kitt_tip">Tipp: Für den richtigen KITT-Effekt stell die Breite auf ⅓ der LED-Länge.</string>
     <string name="unknown">Unbekannt</string>
     <string name="off">Aus</string>
     <string name="on">An</string>

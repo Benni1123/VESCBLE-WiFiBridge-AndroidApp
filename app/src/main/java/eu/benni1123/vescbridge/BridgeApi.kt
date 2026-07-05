@@ -8,6 +8,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.time.Duration.Companion.milliseconds
 
 // Hilfsfunktion um Booleans sowohl als echte JSON-Booleans (true/false) als auch
 // als Integers (1/0) zu lesen. Macht die API robuster gegen Firmware-Aenderungen.
@@ -15,7 +16,7 @@ private fun JSONObject.optBool(key: String, fallback: Boolean): Boolean {
     if (!has(key)) return fallback
     return try {
         getBoolean(key)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         optInt(key, if (fallback) 1 else 0) != 0
     }
 }
@@ -83,7 +84,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 return block()
             } catch (e: Exception) {
                 lastEx = e
-                if (i <= retries) delay(150) // Kurz warten vor dem naechsten Versuch
+                if (i <= retries) delay(150.milliseconds) // Kurz warten vor dem naechsten Versuch
             }
         }
         throw lastEx ?: IOException("Unknown error")
@@ -153,7 +154,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
     }
 
     suspend fun postConfig(jsonBody: String): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry { httpPostBody("/api/config", jsonBody) } } catch (e: Exception) { false }
+        try { withRetry { httpPostBody(jsonBody) } } catch (_: Exception) { false }
     }
 
     suspend fun scanWifi(): List<String> = withContext(Dispatchers.IO) {
@@ -167,7 +168,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                     val net = arr.getJSONObject(i)
                     list.add(net.getString("ssid"))
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Fallback auf Objekt mit "networks" Key
                 val o = JSONObject(json)
                 val arr = o.getJSONArray("networks")
@@ -177,19 +178,19 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 }
             }
             list.distinct().filter { it.isNotBlank() }
-        } catch (e: Exception) { emptyList() }
+        } catch (_: Exception) { emptyList() }
     }
 
     suspend fun post(path: String): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry { httpPost(path) } } catch (e: Exception) { false }
+        try { withRetry { httpPost(path) } } catch (_: Exception) { false }
     }
 
     suspend fun restart(): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry { httpPost("/api/restart") } } catch (e: Exception) { false }
+        try { withRetry { httpPost("/api/restart") } } catch (_: Exception) { false }
     }
 
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry(retries = 0) { httpGet("/api/ping", timeout = 1000); true } } catch (e: Exception) { false }
+        try { withRetry(retries = 0) { httpGet("/api/ping", timeout = 1000); true } } catch (_: Exception) { false }
     }
 
     suspend fun fetchUpdateStatus(): BridgeUpdateStatus = withContext(Dispatchers.IO) {
@@ -201,7 +202,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 latest = o.optString("available", ""),
                 available = o.optBool("update_available", false)
             )
-        } catch (e: Exception) { BridgeUpdateStatus(serverError = true) }
+        } catch (_: Exception) { BridgeUpdateStatus(serverError = true) }
     }
 
     suspend fun checkUpdate(): BridgeUpdateStatus = withContext(Dispatchers.IO) {
@@ -213,11 +214,11 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 latest = o.optString("available", ""),
                 available = o.optBool("update_available", false)
             )
-        } catch (e: Exception) { BridgeUpdateStatus(serverError = true) }
+        } catch (_: Exception) { BridgeUpdateStatus(serverError = true) }
     }
 
     suspend fun installUpdate(): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry { httpPost("/api/update/install") } } catch (e: Exception) { false }
+        try { withRetry { httpPost("/api/update/install") } } catch (_: Exception) { false }
     }
 
     private fun httpGet(path: String, timeout: Int = 5000): String {
@@ -252,15 +253,15 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
         try {
             conn.outputStream.use { it.write(ByteArray(0)) }
             return conn.responseCode in 200..299
-        } catch (e: Exception) {
-            throw e
+        } catch (_: Exception) {
+            return false
         } finally {
             conn.disconnect()
         }
     }
 
-    private fun httpPostBody(path: String, body: String): Boolean {
-        val url = URL(baseUrl + path)
+    private fun httpPostBody(body: String): Boolean {
+        val url = URL("$baseUrl/api/config")
         val conn = (if (network != null) network.openConnection(url) else url.openConnection()) as HttpURLConnection
         conn.apply {
             requestMethod = "POST"
@@ -273,8 +274,8 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
         try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             return conn.responseCode in 200..299
-        } catch (e: Exception) {
-            throw e
+        } catch (_: Exception) {
+            return false
         } finally {
             conn.disconnect()
         }
