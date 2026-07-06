@@ -96,6 +96,9 @@
     <string name="ble_mode">BLE Mode</string>
     <string name="ble_auto_on_erpm">Auto-ON from ERPM</string>
     <string name="ble_auto_off_sec_label">Auto-OFF after (s)</string>
+    <string name="ble_pin_enabled">Require PIN for BLE pairing</string>
+    <string name="ble_pin">BLE pairing PIN (6 digits)</string>
+    <string name="ble_pin_error">BLE PIN must be exactly 6 digits</string>
     <string name="access_point_section">Access Point</string>
     <string name="ap_ssid_label">AP-SSID</string>
     <string name="ap_password_label">AP Password</string>
@@ -140,6 +143,14 @@
     <string name="save_failed">Save failed</string>
 
     <!-- MainActivity / Navigation Strings -->
+    <string name="autopoll_section_title">VESC Auto-Poll</string>
+    <string name="erpm_title_label">Movement Detection</string>
+    <string name="factory_reset">Factory Reset</string>
+    <string name="factory_reset_q">Factory reset?</string>
+    <string name="factory_reset_msg">This will clear all settings on the bridge and restart it. You will need to reconnect to the default AP.</string>
+    <string name="wifi_client_label">WiFi Client</string>
+    <string name="free_ram">Free RAM</string>
+    <string name="sta_scans">STA scans</string>
     <string name="nav_status">Status</string>
     <string name="nav_led">LED</string>
     <string name="nav_config">Config</string>

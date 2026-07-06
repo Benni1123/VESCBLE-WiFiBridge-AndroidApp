@@ -136,15 +136,15 @@ fun AppRoot(vm: MainViewModel) {
                             titleContentColor = MaterialTheme.colorScheme.primary
                         )
                     )
-                    DeviceSelectorBar(
-                        devices = devices,
-                        selected = selected,
-                        activeHost = activeHost,
-                        state = connState,
-                        progress = progress,
-                        onSelect = { vm.selectDevice(it.id) },
-                        onManage = { screen = Screen.Devices }
-                    )
+                        DeviceSelectorBar(
+                            devices = devices,
+                            selected = selected,
+                            activeHost = activeHost,
+                            state = connState,
+                            progress = progress,
+                            vm = vm,
+                            onManageDevices = { screen = Screen.Devices }
+                        )
                 }
             },
             bottomBar = {
@@ -198,10 +198,15 @@ fun DeviceSelectorBar(
     activeHost: String?,
     state: ConnState,
     progress: Float?,
-    onSelect: (Device) -> Unit,
-    onManage: () -> Unit
+    vm: MainViewModel,
+    onManageDevices: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expandedSelect by remember { mutableStateOf(false) }
+    var expandedSettings by remember { mutableStateOf(false) }
+    
+    var showEspUpdateDialog by remember { mutableStateOf(false) }
+    var showAppUpdateDialog by remember { mutableStateOf(false) }
+    
     val dotColor = when (state) {
         ConnState.Online -> Color(0xFF4CAF50)
         ConnState.Searching, ConnState.ConnectingAp, ConnState.Rebooting -> MaterialTheme.colorScheme.primary
@@ -242,22 +247,40 @@ fun DeviceSelectorBar(
                     )
                 }
                 if (devices.size > 1) {
-                    IconButton(onClick = { expanded = true }) {
+                    IconButton(onClick = { expandedSelect = true }) {
                         Icon(Icons.Filled.SwapHoriz, stringResource(R.string.switch_device), tint = MaterialTheme.colorScheme.primary)
                     }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    DropdownMenu(expanded = expandedSelect, onDismissRequest = { expandedSelect = false }) {
                         devices.forEach { d ->
-                            val isSelected = d.id == selected?.id
-                            val host = if (isSelected) (activeHost ?: d.hosts.firstOrNull()) else d.hosts.firstOrNull()
                             DropdownMenuItem(
-                                text = { Text("${d.name}  (${host ?: "?"})") },
-                                onClick = { onSelect(d); expanded = false }
+                                text = { Text("${d.name}  (${d.hosts.firstOrNull() ?: "?"})") },
+                                onClick = { vm.selectDevice(d.id); expandedSelect = false }
                             )
                         }
                     }
                 }
-                IconButton(onClick = onManage) {
-                    Icon(Icons.Filled.Settings, stringResource(R.string.manage_devices), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                
+                Box {
+                    IconButton(onClick = { expandedSettings = true }) {
+                        Icon(Icons.Filled.Settings, stringResource(R.string.manage_devices), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    DropdownMenu(expanded = expandedSettings, onDismissRequest = { expandedSettings = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.nav_devices)) },
+                            leadingIcon = { Icon(Icons.Filled.Dns, null) },
+                            onClick = { onManageDevices(); expandedSettings = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.firmware_update)) },
+                            leadingIcon = { Icon(Icons.Filled.SystemUpdate, null) },
+                            onClick = { showEspUpdateDialog = true; expandedSettings = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.app_update)) },
+                            leadingIcon = { Icon(Icons.Filled.BrowserUpdated, null) },
+                            onClick = { showAppUpdateDialog = true; expandedSettings = false }
+                        )
+                    }
                 }
             }
             progress?.let {
@@ -269,5 +292,98 @@ fun DeviceSelectorBar(
                 )
             }
         }
+    }
+
+    if (showEspUpdateDialog) {
+        EspUpdateDialog(vm) { showEspUpdateDialog = false }
+    }
+    if (showAppUpdateDialog) {
+        AppUpdateDialog(vm) { showAppUpdateDialog = false }
+    }
+}
+
+@Composable
+fun EspUpdateDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    val update by vm.updateStatus.collectAsStateWithLifecycle()
+    val busy by vm.updateBusy.collectAsStateWithLifecycle()
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.firmware_update)) },
+        text = {
+            Column {
+                if (update == null) {
+                    CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                } else {
+                    Text(stringResource(R.string.version_current) + ": ${update?.current}")
+                    Text(stringResource(R.string.version_new) + ": ${update?.latest}")
+                    if (update?.available == true) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(stringResource(R.string.install_firmware_update_msg))
+                    } else {
+                        Text(stringResource(R.string.firmware_up_to_date), color = Color(0xFF4CAF50))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row {
+                TextButton(onClick = { vm.checkForUpdate() }, enabled = !busy) {
+                    if (busy) CircularProgressIndicator(Modifier.size(18.dp)) else Text(stringResource(R.string.check_for_updates))
+                }
+                if (update?.available == true) {
+                    Button(onClick = { vm.triggerUpdate { onDismiss() } }, enabled = !busy) {
+                        Text(stringResource(R.string.install))
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+    
+    LaunchedEffect(Unit) {
+        vm.loadUpdateStatus()
+    }
+}
+
+@Composable
+fun AppUpdateDialog(vm: MainViewModel, onDismiss: () -> Unit) {
+    val update by vm.appUpdateInfo.collectAsStateWithLifecycle()
+    val busy by vm.appUpdateBusy.collectAsStateWithLifecycle()
+    val progress by vm.appUpdateProgress.collectAsStateWithLifecycle()
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.app_update)) },
+        text = {
+            Column {
+                if (update == null && busy) {
+                    CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                } else if (update != null) {
+                    Text(stringResource(R.string.new_version_available) + ": ${update?.latestVersionCode}")
+                    if (progress != null) {
+                        LinearProgressIndicator(progress = { progress!! }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    }
+                } else {
+                    Text(stringResource(R.string.app_up_to_date), color = Color(0xFF4CAF50))
+                }
+            }
+        },
+        confirmButton = {
+            if (update != null && progress == null) {
+                Button(onClick = { vm.downloadAppUpdate() }, enabled = !busy) {
+                    Text(stringResource(R.string.download_install_update))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+    
+    LaunchedEffect(Unit) {
+        vm.checkAppUpdate()
     }
 }

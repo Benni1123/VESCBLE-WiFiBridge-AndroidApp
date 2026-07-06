@@ -75,6 +75,8 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
 
     var bleName by remember(k) { mutableStateOf(config.bleName) }
     var bleMode by remember(k) { mutableStateOf(config.bleMode) }
+    var blePinEnabled by remember(k) { mutableStateOf(config.blePinEnabled) }
+    var blePin by remember(k) { mutableStateOf(config.blePin.toString().padStart(6, '0')) }
     var bleErpmOn by remember(k) { mutableStateOf(config.bleAutoErpmOn.toString()) }
     var bleOffSec by remember(k) { mutableStateOf(config.bleAutoOffSec.toString()) }
     var apSsid  by remember(k) { mutableStateOf(config.apSsid) }
@@ -109,51 +111,62 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
 
     val savedRestarting = stringResource(R.string.saved_restarting)
     val saveFailed = stringResource(R.string.save_failed)
+    val blePinError = stringResource(R.string.ble_pin_error)
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
 
             CfgSection(stringResource(R.string.ble_section)) {
                 CfgText(stringResource(R.string.ble_name_config), bleName) { bleName = it }
-                CfgDropdown(stringResource(R.string.ble_mode), bleMode,
-                    listOf(stringResource(R.string.ble_off), stringResource(R.string.ble_on), stringResource(R.string.ble_auto))) { bleMode = it }
-                CfgNumber(stringResource(R.string.ble_auto_on_erpm), bleErpmOn) { bleErpmOn = it }
-                CfgNumber(stringResource(R.string.ble_auto_off_sec_label), bleOffSec) { bleOffSec = it }
+                CfgSwitch(stringResource(R.string.ble_pin_enabled), blePinEnabled) { blePinEnabled = it }
+                if (blePinEnabled) {
+                    CfgNumber(stringResource(R.string.ble_pin), blePin) { blePin = it.take(6) }
+                }
             }
             CfgSection(stringResource(R.string.access_point_section)) {
                 CfgText(stringResource(R.string.ap_ssid_label), apSsid) { apSsid = it }
                 CfgPassword(stringResource(R.string.ap_password_label), apPass) { apPass = it }
-                CfgDropdown(stringResource(R.string.mode), apMode,
-                    listOf("", stringResource(R.string.ap_on), stringResource(R.string.ap_auto)),
-                    startIndex = 1) { apMode = it }
-                if (apMode == 2) {
-                    CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
+                CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
+                CfgSwitch(stringResource(R.string.ap_wake_on_move_label), apMode == 2) { 
+                    apMode = if (it) 2 else 1 
+                }
+            }
+            CfgSection(stringResource(R.string.ble_mode)) {
+                CfgDropdown(stringResource(R.string.mode), bleMode,
+                    listOf(stringResource(R.string.ble_off), stringResource(R.string.ble_on), stringResource(R.string.ble_auto))) { bleMode = it }
+                if (bleMode == 2) {
+                    CfgNumber(stringResource(R.string.ble_auto_off_sec_label), bleOffSec) { bleOffSec = it }
                 }
             }
             CfgSection(stringResource(R.string.vesc_uart_section)) {
                 CfgNumber(stringResource(R.string.tcp_port), port) { port = it }
-                CfgNumber(stringResource(R.string.rx_pin_label), rxPin) { rxPin = it }
-                CfgNumber(stringResource(R.string.tx_pin_label), txPin) { txPin = it }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) { CfgNumber(stringResource(R.string.rx_pin_label), rxPin) { rxPin = it } }
+                    Box(Modifier.weight(1f)) { CfgNumber(stringResource(R.string.tx_pin_label), txPin) { txPin = it } }
+                }
                 CfgSwitch(stringResource(R.string.vesc_polling), vescPoll) { vescPoll = it }
-                CfgSwitch(stringResource(R.string.auto_polling), autopollEn) { autopollEn = it }
-                CfgNumber(stringResource(R.string.poll_interval_label), autopollInt) { autopollInt = it }
-            }
-            CfgSection(stringResource(R.string.auto_reboot_section)) {
                 CfgSwitch(stringResource(R.string.auto_reboot_active), autoreboot) { autoreboot = it }
-                CfgNumber(stringResource(R.string.reboot_after_s), autorebootTime) { autorebootTime = it }
-                CfgSwitch(stringResource(R.string.even_on_wifi), autorebootNoWifi) { autorebootNoWifi = it }
+                if (autoreboot) {
+                    CfgNumber(stringResource(R.string.reboot_after_s), autorebootTime) { autorebootTime = it }
+                    CfgSwitch(stringResource(R.string.even_on_wifi), autorebootNoWifi) { autorebootNoWifi = it }
+                }
             }
             CfgSection(stringResource(R.string.roaming_section)) {
                 CfgSwitch(stringResource(R.string.roaming_active), roamEn) { roamEn = it }
-                CfgNumber(stringResource(R.string.threshold_dbm), roamThr) { roamThr = it }
-                CfgNumber(stringResource(R.string.hysteresis_db), roamHyst) { roamHyst = it }
+                if (roamEn) {
+                    CfgNumber(stringResource(R.string.threshold_dbm), roamThr) { roamThr = it }
+                    CfgNumber(stringResource(R.string.hysteresis_db), roamHyst) { roamHyst = it }
+                }
             }
-            CfgSection(stringResource(R.string.led_section)) {
-                CfgSwitch(stringResource(R.string.led_control_active), ledsEn) { ledsEn = it }
+            CfgSection(stringResource(R.string.autopoll_section_title)) {
+                CfgSwitch(stringResource(R.string.auto_polling), autopollEn) { autopollEn = it }
+                if (autopollEn) {
+                    CfgNumber(stringResource(R.string.poll_interval_label), autopollInt) { autopollInt = it }
+                }
             }
             CfgSection(stringResource(R.string.update_urls_section)) {
-                CfgText(stringResource(R.string.firmware_url), updateUrl) { updateUrl = it }
                 CfgText(stringResource(R.string.version_url), versionUrl) { versionUrl = it }
+                CfgText(stringResource(R.string.firmware_url), updateUrl) { updateUrl = it }
             }
             CfgSection(stringResource(R.string.wifi_networks_section)) {
                 wifiList.forEachIndexed { idx, net ->
@@ -246,8 +259,25 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
             }
 
             Spacer(Modifier.height(8.dp))
+            CfgSection(stringResource(R.string.led_section)) {
+                CfgSwitch(stringResource(R.string.led_control_active), ledsEn) { ledsEn = it }
+            }
+
+            if (bleMode == 2 || apMode == 2) {
+                CfgSection(stringResource(R.string.erpm_title_label)) {
+                    CfgNumber(stringResource(R.string.ble_auto_on_erpm), bleErpmOn) { bleErpmOn = it }
+                }
+            }
+
+            var showFactoryConfirm by remember { mutableStateOf(false) }
+
+            Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
+                    if (blePinEnabled && blePin.length != 6) {
+                        scope.launch { snackbar.showSnackbar(blePinError) }
+                        return@Button
+                    }
                     val newCfg = BridgeConfig(
                         bleName = bleName, apSsid = apSsid, apPass = apPass,
                         apMode = apMode,
@@ -257,8 +287,12 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                         autorebootNoWifi = autorebootNoWifi,
                         roamEnabled = roamEn, roamThreshold = i(roamThr, -75),
                         roamHysteresis = i(roamHyst, 12),
-                        autopollEnabled = autopollEn, autopollInterval = i(autopollInt, 5),
-                        bleMode = bleMode, bleAutoErpmOn = i(bleErpmOn, 200),
+                        autopollEnabled = autopollEn || (bleMode == 2) || (apMode == 2),
+                        autopollInterval = i(autopollInt, 5),
+                        bleMode = bleMode,
+                        blePinEnabled = blePinEnabled,
+                        blePin = i(blePin, 123456),
+                        bleAutoErpmOn = i(bleErpmOn, 200),
                         bleAutoOffSec = i(bleOffSec, 120),
                         ledsEnabled = ledsEn, updateUrl = updateUrl, versionUrl = versionUrl,
                         wifi = wifiList.filter { it.ssid.isNotBlank() }.map { it.toWifiNet() }
@@ -281,8 +315,37 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                 }
                 Text(stringResource(R.string.save))
             }
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { showFactoryConfirm = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.factory_reset))
+            }
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.save_reboot_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+
+            if (showFactoryConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showFactoryConfirm = false },
+                    title = { Text(stringResource(R.string.factory_reset_q)) },
+                    text = { Text(stringResource(R.string.factory_reset_msg)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showFactoryConfirm = false
+                            vm.factoryReset { ok ->
+                                scope.launch {
+                                    snackbar.showSnackbar(if (ok) "Reset successful" else "Reset failed")
+                                }
+                            }
+                        }) { Text(stringResource(R.string.factory_reset), color = MaterialTheme.colorScheme.error) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showFactoryConfirm = false }) { Text(stringResource(R.string.cancel)) }
+                    }
+                )
+            }
             Spacer(Modifier.height(40.dp))
         }
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter))

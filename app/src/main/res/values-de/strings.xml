@@ -95,6 +95,9 @@
     <string name="ble_mode">BLE-Modus</string>
     <string name="ble_auto_on_erpm">Auto-AN ab ERPM</string>
     <string name="ble_auto_off_sec_label">Auto-AUS nach (s)</string>
+    <string name="ble_pin_enabled">PIN beim BLE-Koppeln verlangen</string>
+    <string name="ble_pin">BLE-Kopplungs-PIN (6 Ziffern)</string>
+    <string name="ble_pin_error">BLE-PIN muss genau 6 Ziffern haben</string>
     <string name="access_point_section">Access Point</string>
     <string name="ap_ssid_label">AP-SSID</string>
     <string name="ap_password_label">AP-Passwort</string>
@@ -139,6 +142,14 @@
     <string name="save_failed">Speichern fehlgeschlagen</string>
 
     <!-- MainActivity / Navigation Strings -->
+    <string name="autopoll_section_title">VESC Auto-Poll</string>
+    <string name="erpm_title_label">Bewegungserkennung</string>
+    <string name="factory_reset">Werkseinstellungen</string>
+    <string name="factory_reset_q">Werkseinstellungen?</string>
+    <string name="factory_reset_msg">Dies löscht alle Einstellungen auf der Bridge und startet sie neu. Du musst dich dann wieder mit dem Standard-AP verbinden.</string>
+    <string name="wifi_client_label">WiFi-Client</string>
+    <string name="free_ram">Freies RAM</string>
+    <string name="sta_scans">STA scans</string>
     <string name="nav_status">Status</string>
     <string name="nav_led">LED</string>
     <string name="nav_config">Konfig</string>

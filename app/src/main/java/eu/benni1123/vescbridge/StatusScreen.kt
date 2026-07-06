@@ -25,26 +25,13 @@ fun StatusScreen(vm: MainViewModel) {
     val connState  by vm.state.collectAsStateWithLifecycle()
     val activeHost by vm.activeHost.collectAsStateWithLifecycle()
     val selected   by vm.selected.collectAsStateWithLifecycle()
-    val update     by vm.updateStatus.collectAsStateWithLifecycle()
-    val updateBusy by vm.updateBusy.collectAsStateWithLifecycle()
-    val appUpdate  by vm.appUpdateInfo.collectAsStateWithLifecycle()
-    val appBusy    by vm.appUpdateBusy.collectAsStateWithLifecycle()
-    val appProgress by vm.appUpdateProgress.collectAsStateWithLifecycle()
-    val progress   by vm.rebootProgress.collectAsStateWithLifecycle()
 
     var showRestartConfirm by remember { mutableStateOf(false) }
-    var showUpdateConfirm by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     val restartTriggered = stringResource(R.string.restart_triggered)
     val failed = stringResource(R.string.failed)
-    val updateStarted = stringResource(R.string.update_started_msg)
-    val updateFailed = stringResource(R.string.update_failed)
-
-    LaunchedEffect(connState) {
-        if (connState == ConnState.Online) vm.loadUpdateStatus()
-    }
 
     val currentSelected = selected
     if (currentSelected == null) {
@@ -99,158 +86,54 @@ fun StatusScreen(vm: MainViewModel) {
         }
 
         info?.let { d ->
-            SectionCard(stringResource(R.string.connection)) {
-                val onlineNow = connState == ConnState.Online
-                InfoRow(stringResource(R.string.status), if (onlineNow) stringResource(R.string.online) else stringResource(R.string.offline),
-                    if (onlineNow) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error)
+            SectionCard(stringResource(R.string.status)) {
+                InfoRow(stringResource(R.string.ble_name_label), d.bleName)
+                InfoRow(stringResource(R.string.ble_mac), d.bleMac)
+                InfoRow(stringResource(R.string.ble_connected), if (d.bleConnected) stringResource(R.string.online) else stringResource(R.string.offline),
+                    if (d.bleConnected) Color(0xFF4CAF50) else Color(0xFFF44336))
                 
-                activeHost?.let { 
-                    val label = if (it == d.apIp) stringResource(R.string.active_conn_ap) else stringResource(R.string.active_conn_wifi)
-                    InfoRow(label, it, MaterialTheme.colorScheme.primary) 
-                }
+                InfoRow(stringResource(R.string.wifi_client_label), if (d.wifiClientConnected) stringResource(R.string.online) else stringResource(R.string.offline),
+                    if (d.wifiClientConnected) Color(0xFF4CAF50) else Color(0xFFF44336))
 
-                InfoRow(stringResource(R.string.mode), if (d.mode == "ap") stringResource(R.string.access_point) else stringResource(R.string.wifi))
-                
+                InfoRow(stringResource(R.string.ip), d.ip)
                 if (d.ssid.isNotEmpty()) {
                     InfoRow(stringResource(R.string.ssid_label), d.ssid)
                     InfoRow(stringResource(R.string.signal_strength), "${d.rssi} dBm")
                 }
-
-                // WLAN-IP nur zeigen, wenn sie NICHT die aktive Verbindung ist
-                if (d.ip.isNotEmpty() && d.ip != "0.0.0.0" && d.ip != activeHost) {
-                    InfoRow(stringResource(R.string.wifi_ip_device), d.ip)
-                }
                 
-                // AP-IP nur zeigen, wenn sie NICHT die aktive Verbindung ist
-                if (d.apIp.isNotEmpty() && d.apIp != activeHost) {
-                    InfoRow(stringResource(R.string.ap_ip), d.apIp)
-                }
+                InfoRow(stringResource(R.string.free_ram), "%.1f KB".format(locale, d.heap / 1024.0))
+                
+                val apStatusText = if (d.apActive) "Active (${d.apIp})" else "Off"
+                InfoRow(stringResource(R.string.access_point), apStatusText, if (d.apActive) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface)
 
-                if (d.apClientIp.isNotEmpty()) {
-                    InfoRow(stringResource(R.string.connected_device), d.apClientIp, Color(0xFF4CAF50))
-                }
-
-                if (d.apActive) {
-                    val timeoutStr = if (d.apTimeoutRemaining > 0) "${d.apTimeoutRemaining}s" else stringResource(R.string.infinite)
-                    InfoRow(stringResource(R.string.ap_visible), stringResource(R.string.yes_timeout, timeoutStr), Color(0xFF4CAF50))
-                }
+                InfoRow(stringResource(R.string.tcp_port), d.port.toString())
+                InfoRow("UART", "RX=GPIO${d.rxPin.toString().padStart(2, '0')} TX=GPIO${d.txPin.toString().padStart(2, '0')}")
             }
 
-            SectionCard(stringResource(R.string.ble_vesc_conn)) {
-                InfoRow(stringResource(R.string.ble_connected), if (d.bleConnected) stringResource(R.string.yes) else stringResource(R.string.no),
-                    if (d.bleConnected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error)
-                if (d.bleName.isNotEmpty()) InfoRow(stringResource(R.string.ble_name_label), d.bleName)
-                if (d.bleMac.isNotEmpty()) InfoRow(stringResource(R.string.ble_mac), d.bleMac)
-            }
-
-            SectionCard(stringResource(R.string.vesc_telemetry)) {
-                InfoRow(stringResource(R.string.vesc_connected), if (d.vescConnected) stringResource(R.string.yes) else stringResource(R.string.no),
-                    if (d.vescConnected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error)
+            SectionCard("VESC") {
+                InfoRow("VESC", if (d.vescConnected) stringResource(R.string.online) else stringResource(R.string.offline),
+                    if (d.vescConnected) Color(0xFF4CAF50) else Color(0xFFF44336))
+                
                 InfoRow(stringResource(R.string.voltage), "%.1f V".format(locale, d.vescVoltage))
-                InfoRow(stringResource(R.string.erpm_label), d.vescErpm.toString())
                 InfoRow(stringResource(R.string.temp_fet), "%.0f \u00b0C".format(locale, d.vescTempFet))
                 InfoRow(stringResource(R.string.temp_motor), "%.0f \u00b0C".format(locale, d.vescTempMotor))
-                if (d.vescFaultStr.isNotEmpty() && d.vescFaultStr != "FAULT_CODE_NONE")
-                    InfoRow(stringResource(R.string.error), d.vescFaultStr, MaterialTheme.colorScheme.error)
-                if (d.vescFault > 0)
-                    InfoRow(stringResource(R.string.error_id), d.vescFault.toString(), MaterialTheme.colorScheme.error)
-            }
-
-            SectionCard(stringResource(R.string.firmware_update)) {
-                val u = update
-                if (u == null) {
-                    Text(stringResource(R.string.loading_update_status), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                } else {
-                    InfoRow(stringResource(R.string.version_current), u.current)
-                    if (u.serverError) {
-                        Text(stringResource(R.string.update_server_unreachable), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                    } else {
-                        if (u.latest.isNotEmpty()) {
-                            InfoRow(stringResource(R.string.version_new), u.latest)
-                        }
-                        if (!u.available && (u.latest.isEmpty() || u.current == u.latest)) {
-                            Text(stringResource(R.string.firmware_up_to_date), color = Color(0xFF4CAF50), fontSize = 12.sp)
-                        }
-                    }
-                    
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        if (u.available || (u.latest.isNotEmpty() && u.current != u.latest)) {
-                            TextButton(
-                                onClick = { showUpdateConfirm = true },
-                                enabled = !updateBusy && progress == null
-                            ) {
-                                if (updateBusy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                                else Text(stringResource(R.string.install_update_now), fontSize = 12.sp)
-                            }
-                        }
-                        TextButton(
-                            onClick = { vm.checkForUpdate() },
-                            enabled = !updateBusy && progress == null
-                        ) { Text(stringResource(R.string.check_for_updates), fontSize = 12.sp) }
-                    }
-                }
-            }
-
-            SectionCard(stringResource(R.string.app_update)) {
-                val au = appUpdate
-                if (au != null) {
-                    InfoRow(stringResource(R.string.version_new), au.latestVersionCode.toString())
-                } else if (!appBusy) {
-                    Text(stringResource(R.string.app_up_to_date), color = Color(0xFF4CAF50), fontSize = 12.sp)
-                } else {
-                    Text(stringResource(R.string.searching_app_updates), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                }
-
-                val currentAppProgress = appProgress
-                if (currentAppProgress != null) {
-                    Column(Modifier.padding(top = 8.dp)) {
-                        LinearProgressIndicator(
-                            progress = { currentAppProgress },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text("%.0f%%".format(locale, currentAppProgress * 100), fontSize = 11.sp)
-                    }
-                }
+                InfoRow(stringResource(R.string.error), d.vescFaultStr.ifEmpty { "OK" }, if (d.vescFault > 0) Color(0xFFF44336) else Color(0xFF4CAF50))
+                InfoRow(stringResource(R.string.erpm_label), d.vescErpm.toString())
                 
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (au != null && currentAppProgress == null) {
-                        TextButton(
-                            onClick = { vm.downloadAppUpdate() },
-                            enabled = !appBusy
-                        ) {
-                            if (appBusy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            else Text(stringResource(R.string.download_install_update), fontSize = 12.sp)
-                        }
-                    }
-                    TextButton(
-                        onClick = { vm.checkAppUpdate() },
-                        enabled = !appBusy
-                    ) { Text(stringResource(R.string.check_app_updates), fontSize = 12.sp) }
-                }
-            }
-
-            SectionCard(stringResource(R.string.system)) {
                 InfoRow(stringResource(R.string.uptime), d.uptime)
-                InfoRow(stringResource(R.string.free_heap), "${d.heap / 1024} kB")
-                if (d.version.isNotEmpty()) InfoRow(stringResource(R.string.version), d.version)
-                if (d.port != -1) InfoRow(stringResource(R.string.tcp_port), d.port.toString())
-                if (d.rxPin != -1) InfoRow("UART RX", "Pin ${d.rxPin}")
-                if (d.txPin != -1) InfoRow("UART TX", "Pin ${d.txPin}")
+                InfoRow("Build", d.version)
             }
 
-            SectionCard(stringResource(R.string.diagnostics_esp32)) {
-                InfoRow(stringResource(R.string.wifi_scans), d.diagScans.toString())
+            SectionCard(stringResource(R.string.diagnostics_esp32).uppercase()) {
+                InfoRow(stringResource(R.string.sta_scans), d.diagScans.toString())
                 InfoRow(stringResource(R.string.sta_connections), d.diagStaConn.toString())
                 InfoRow(stringResource(R.string.sta_disconnects), d.diagStaDisc.toString())
-                if (d.diagStaDisc > 0) InfoRow(stringResource(R.string.last_reason_sta), d.diagDiscReason.toString())
-                InfoRow(stringResource(R.string.ap_connections), d.diagApConn.toString())
-                InfoRow(stringResource(R.string.ap_disconnects), d.diagApDisc.toString())
-                InfoRow(stringResource(R.string.probe_requests), d.diagProbeReqs.toString())
-                if (d.diagProbeReqs > 0) InfoRow(stringResource(R.string.probe_rssi_avg), "${d.diagProbeRssi} dBm")
+                InfoRow("AP client conn/disc", "${d.diagApConn} / ${d.diagApDisc}")
                 InfoRow(stringResource(R.string.watchdog_resets), d.diagWdFires.toString())
-                InfoRow(stringResource(R.string.max_loop_time), "${d.diagLoopMaxUs} \u00b5s")
-                InfoRow(stringResource(R.string.loops_per_sec), d.diagLoopsPerSec.toString())
-                InfoRow(stringResource(R.string.min_free_heap), "${d.diagMinHeap / 1024} kB")
+                InfoRow("Loop max (ms)", "%.1f".format(locale, d.diagLoopMaxUs / 1000.0))
+                InfoRow("Loops/sec", d.diagLoopsPerSec.toString())
+                InfoRow(stringResource(R.string.min_free_heap), "${d.diagMinHeap / 1024} KB")
+                InfoRow("Probe requests (RSSI)", "${d.diagProbeReqs} (${d.diagProbeRssi} dBm)")
             }
 
             Spacer(Modifier.height(8.dp))
@@ -265,7 +148,6 @@ fun StatusScreen(vm: MainViewModel) {
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(R.string.restart)) }
             }
-            // Wenn die genutzte IP die AP-IP ist, Trennen-Option anbieten.
             if (activeHost == "192.168.9.1") {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
@@ -293,27 +175,6 @@ fun StatusScreen(vm: MainViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showRestartConfirm = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
-
-    if (showUpdateConfirm) {
-        AlertDialog(
-            onDismissRequest = { showUpdateConfirm = false },
-            title = { Text(stringResource(R.string.install_firmware_update_q)) },
-            text = { Text(stringResource(R.string.install_firmware_update_msg)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showUpdateConfirm = false
-                    vm.triggerUpdate { ok ->
-                        scope.launch {
-                            snackbar.showSnackbar(if (ok) updateStarted else updateFailed)
-                        }
-                    }
-                }) { Text(stringResource(R.string.install)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUpdateConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

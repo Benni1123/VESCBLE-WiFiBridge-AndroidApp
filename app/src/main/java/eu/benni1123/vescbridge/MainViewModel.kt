@@ -594,6 +594,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { store.select(id) }
     }
 
+    fun factoryReset(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val dev = _selected.value
+            val ok = api()?.post("/api/factory-reset") ?: false
+            if (ok) {
+                if (dev != null) {
+                    val updatedDev = dev.copy(
+                        hosts = emptyList(),
+                        apSsid = "VESC-BLE-WiFi",
+                        apPassword = ""
+                    )
+                    store.addOrUpdate(updatedDev)
+                    _selected.value = updatedDev
+                }
+                prepareForReboot()
+                startRebootCountdown(10000L)
+            }
+            onResult(ok)
+        }
+    }
+
     fun restart(onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val ok = api()?.restart() ?: false

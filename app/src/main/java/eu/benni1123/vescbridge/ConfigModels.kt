@@ -45,6 +45,8 @@ data class BridgeConfig(
     val autopollEnabled: Boolean = false,
     val autopollInterval: Int = 5,
     val bleMode: Int = 1,
+    val blePinEnabled: Boolean = false,
+    val blePin: Int = 123456,
     val bleAutoErpmOn: Int = 200,
     val bleAutoOffSec: Int = 120,
     val ledsEnabled: Boolean = false,
@@ -89,6 +91,8 @@ data class BridgeConfig(
                 autopollEnabled = o.optBool("autopoll_enabled", false),
                 autopollInterval = o.optInt("autopoll_interval", 5),
                 bleMode = if (o.has("ble_mode")) o.getInt("ble_mode") else if (o.has("bleMode")) o.getInt("bleMode") else 1,
+                blePinEnabled = o.optBool("ble_pin_enabled", false),
+                blePin = o.optInt("ble_pin", 123456),
                 bleAutoErpmOn = o.optInt("ble_auto_erpm_on", 200),
                 bleAutoOffSec = o.optInt("ble_auto_off_sec", 120),
                 ledsEnabled = o.optBool("leds_enabled", false),
@@ -107,31 +111,31 @@ data class BridgeConfig(
         o.put("ap_pass", apPass)
         o.put("ap_mode", apMode)
         o.put("port", port)
-        // Booleans als 1/0 senden, da die Firmware-API auf Integers umgestellt wurde
-        // und der dortige Parser (indexOf) damit zuverlaessiger arbeitet.
-        o.put("vesc_poll", if (vescPoll) 1 else 0)
+        o.put("vesc_poll", vescPoll)
         o.put("ap_timeout", apTimeout)
         o.put("rx_pin", rxPin)
         o.put("tx_pin", txPin)
-        o.put("autoreboot", if (autoreboot) 1 else 0)
+        o.put("autoreboot", autoreboot)
         o.put("autoreboot_time", autorebootTime)
-        o.put("autoreboot_no_wifi", if (autorebootNoWifi) 1 else 0)
-        o.put("roam_enabled", if (roamEnabled) 1 else 0)
+        o.put("autoreboot_no_wifi", autorebootNoWifi)
+        o.put("roam_enabled", roamEnabled)
         o.put("roam_threshold", roamThreshold)
         o.put("roam_hysteresis", roamHysteresis)
-        o.put("autopoll_enabled", if (autopollEnabled) 1 else 0)
+        o.put("autopoll_enabled", autopollEnabled)
         o.put("autopoll_interval", autopollInterval)
         o.put("ble_mode", bleMode)
+        o.put("ble_pin_enabled", blePinEnabled)
+        o.put("ble_pin", blePin)
         o.put("ble_auto_erpm_on", bleAutoErpmOn)
         o.put("ble_auto_off_sec", bleAutoOffSec)
-        o.put("leds_enabled", if (ledsEnabled) 1 else 0)
+        o.put("leds_enabled", ledsEnabled)
         o.put("update_url", updateUrl)
         o.put("version_url", versionUrl)
         val arr = JSONArray()
         wifi.forEach { w ->
             arr.put(JSONObject().apply {
                 put("ssid", w.ssid); put("pass", w.pass)
-                put("static", if (w.static) 1 else 0); put("ip", w.ip)
+                put("static", w.static); put("ip", w.ip)
                 put("gateway", w.gateway); put("subnet", w.subnet); put("dns", w.dns)
             })
         }
