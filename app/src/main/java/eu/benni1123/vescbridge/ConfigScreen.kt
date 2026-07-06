@@ -214,7 +214,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                                 )
                                 if (!scanning) {
                                     DropdownMenu(
-                                        expanded = nearby.isNotEmpty(),
+                                        expanded = showScan && nearby.isNotEmpty(),
                                         onDismissRequest = { showScan = false },
                                         modifier = Modifier.fillMaxWidth(0.8f)
                                     ) {

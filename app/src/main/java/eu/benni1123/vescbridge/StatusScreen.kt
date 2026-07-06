@@ -45,17 +45,18 @@ fun StatusScreen(vm: MainViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        if (connState != ConnState.Online && info == null && connState != ConnState.Rebooting) {
+        if (info == null && connState != ConnState.Rebooting) {
             Card {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (connState == ConnState.Searching || connState == ConnState.ConnectingAp) {
+                        if (connState == ConnState.Searching || connState == ConnState.ConnectingAp || connState == ConnState.Online) {
                             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(12.dp))
                         }
                         val msg = when (connState) {
                             ConnState.Searching     -> stringResource(R.string.searching_ip)
                             ConnState.ConnectingAp  -> stringResource(R.string.connecting_ap, currentSelected.apSsid)
+                            ConnState.Online        -> stringResource(R.string.loading_config)
                             ConnState.Offline       -> stringResource(R.string.not_reachable)
                             else -> ""
                         }

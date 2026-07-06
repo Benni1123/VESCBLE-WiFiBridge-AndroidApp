@@ -369,11 +369,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             if (wasOffline || _config.value == null) {
                                 loadConfigSyncToDevice(dev)
                             }
-                        } catch (_: Exception) {
+                        } catch (e: Exception) {
                             // NICHT sofort die Verbindung wegwerfen: ein einzelner
                             // Timeout ist normal. Erst nach MAX_FAILS_BEFORE_DROP
                             // aufeinanderfolgenden Fehlern wirklich neu verbinden.
                             consecutiveFails++
+                            android.util.Log.d("VescDebug", "Fetch info failed ($consecutiveFails): ${e.message}")
 
                             // Sonderfall: Wenn WLAN komplett weg ist und wir nicht am AP hingen,
                             // sofort abbrechen und AP-Suche einleiten (spart Timeouts).
@@ -436,66 +437,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         if (hosts.isEmpty()) return@withContext null
-        val channel = Channel<String?>(hosts.size * 3)
+        
+        // Scope für die parallelen Pings, damit wir Kinder gezielt abbrechen können
+        val result = supervisorScope {
+            val channel = Channel<String?>(hosts.size * 3)
+            val nets = mutableListOf<Network?>(null)
+            if (bound != null) nets.add(bound)
+            val current = wifi.getCurrentWifiNetwork()
+            if (current != null && current != bound) nets.add(current)
 
-        // Wir probieren drei Wege parallel:
-        // 1. null: Der normale Systemweg (Heimnetz-WLAN / LTE)
-        // 2. bound: Die explizite Bindung an den Bridge-AP (falls aktiv)
-        // 3. current: Das aktuelle WLAN (falls der User sich manuell verbunden hat)
-        val current = wifi.getCurrentWifiNetwork()
-        val nets = mutableListOf<Network?>(null)
-        if (bound != null) nets.add(bound)
-        if (current != null && current != bound) nets.add(current)
-
-        nets.forEach { net ->
-            hosts.forEach { h ->
-                launch {
-                    try {
-                        val api = BridgeApi("http://$h", net)
-                        // Ping-Aufruf mit kurzem Timeout, um schnell alle durchzuprobieren
-                        if (api.ping()) {
-                            val netType = when(net) {
-                                null -> "System"
-                                bound -> "Bound"
-                                else -> "CurrentWiFi"
+            nets.forEach { net ->
+                hosts.forEach { h ->
+                    launch {
+                        try {
+                            val api = BridgeApi("http://$h", net)
+                            if (api.ping()) {
+                                val netType = when(net) {
+                                    null -> "System"
+                                    bound -> "Bound"
+                                    else -> "CurrentWiFi"
+                                }
+                                android.util.Log.d("VescDebug", "Host $h is reachable (Net: $netType)")
+                                
+                                if (h == "192.168.9.1" && net == null && bound != null) {
+                                    delay(300.milliseconds)
+                                }
+                                channel.send(h)
+                            } else {
+                                channel.send(null)
                             }
-                            android.util.Log.d("VescDebug", "Host $h is reachable (Net: $netType)")
-                            
-                            // Bevorzugung: Wenn wir die AP-IP suchen, nehmen wir bevorzugt den "Bound" Weg.
-                            // Wenn der System-Weg antwortet, warten wir kurz, ob Bound auch kommt.
-                            if (h == "192.168.9.1" && net == null && bound != null) {
-                                delay(300.milliseconds)
-                            }
-                            
-                            channel.send(h)
-                        } else {
+                        } catch (_: Exception) {
                             channel.send(null)
                         }
-                    } catch (_: Exception) {
-                        channel.send(null)
                     }
                 }
             }
-        }
 
-        var received = 0
-        val totalExpected = hosts.size * nets.size
-        var result: String? = null
-        
-        while (received < totalExpected) {
-            val res = channel.receive()
-            received++
-            if (res != null) {
-                result = res
-                // Wenn es die AP-IP ist, wollen wir sichergehen, dass wir nicht nur
-                // eine "Zufallsverbindung" über das System-Netz haben, sondern
-                // idealerweise über das gebundene Netz.
-                break 
+            var received = 0
+            val totalExpected = hosts.size * nets.size
+            var found: String? = null
+            
+            while (received < totalExpected) {
+                val res = channel.receive()
+                received++
+                if (res != null) {
+                    found = res
+                    break 
+                }
             }
-        }
-        
-        if (result != null) {
             coroutineContext.cancelChildren()
+            android.util.Log.d("VescDebug", "resolveHost returns: $found")
+            found
         }
         result
     }
@@ -511,13 +503,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         // mehrfach versuchen, die Bridge zu erreichen. Der Webserver
                         // auf dem ESP braucht manchmal 1-2 Sek nach WLAN-Connect.
                         var reachable: String? = null
-                        repeat(3) {
-                            delay(1000.milliseconds)
+                        for (attempt in 0..3) {
                             reachable = resolveHost(dev)
-                            if (reachable != null) return@repeat
+                            if (reachable != null) break
+                            if (attempt < 3) delay(1000.milliseconds)
                         }
 
                         if (reachable != null) {
+                            android.util.Log.d("VescDebug", "AP connect: host found $reachable")
                             _activeHost.value = reachable
                             consecutiveFails = 0
                             _state.value = ConnState.Online

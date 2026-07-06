@@ -152,7 +152,7 @@
     <string name="sta_scans">STA scans</string>
     <string name="nav_status">Status</string>
     <string name="nav_led">LED</string>
-    <string name="nav_config">Konfig</string>
+    <string name="nav_config">Config</string>
     <string name="nav_devices">Ger\u00e4te</string>
     <string name="no_device">Kein Ger\u00e4t</string>
     <string name="searching_dots">Suche…</string>
