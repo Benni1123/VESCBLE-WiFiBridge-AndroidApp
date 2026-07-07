@@ -3,8 +3,6 @@ package eu.benni1123.vescbridge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,7 +12,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 
@@ -23,15 +20,9 @@ fun StatusScreen(vm: MainViewModel) {
     val locale     = LocalConfiguration.current.locales[0]
     val info       by vm.info.collectAsStateWithLifecycle()
     val connState  by vm.state.collectAsStateWithLifecycle()
-    val activeHost by vm.activeHost.collectAsStateWithLifecycle()
     val selected   by vm.selected.collectAsStateWithLifecycle()
 
-    var showRestartConfirm by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-
-    val restartTriggered = stringResource(R.string.restart_triggered)
-    val failed = stringResource(R.string.failed)
 
     val currentSelected = selected
     if (currentSelected == null) {
@@ -70,17 +61,6 @@ fun StatusScreen(vm: MainViewModel) {
                             color = MaterialTheme.colorScheme.primary,
                             lineHeight = 14.sp
                         )
-                    }
-                    if (connState == ConnState.Offline) {
-                        Spacer(Modifier.height(12.dp))
-                        Button(
-                            onClick = { vm.refreshNow() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.Refresh, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.retry))
-                        }
                     }
                 }
             }
@@ -136,48 +116,7 @@ fun StatusScreen(vm: MainViewModel) {
                 InfoRow(stringResource(R.string.min_free_heap), "${d.diagMinHeap / 1024} KB")
                 InfoRow("Probe requests (RSSI)", "${d.diagProbeReqs} (${d.diagProbeRssi} dBm)")
             }
-
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = { vm.refreshNow() },
-                    modifier = Modifier.weight(1f)
-                ) { Text(stringResource(R.string.refresh)) }
-                Button(
-                    onClick = { showRestartConfirm = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                    modifier = Modifier.weight(1f)
-                ) { Text(stringResource(R.string.restart)) }
-            }
-            if (activeHost == "192.168.9.1") {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { vm.disconnectAp() },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(stringResource(R.string.disconnect_ap)) }
-            }
         }
-    }
-
-    if (showRestartConfirm) {
-        AlertDialog(
-            onDismissRequest = { showRestartConfirm = false },
-            title = { Text(stringResource(R.string.restart_bridge_q)) },
-            text = { Text(stringResource(R.string.restart_bridge_msg)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRestartConfirm = false
-                    vm.restart { ok ->
-                        scope.launch {
-                            snackbar.showSnackbar(if (ok) restartTriggered else failed)
-                        }
-                    }
-                }) { Text(stringResource(R.string.restart), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRestartConfirm = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
     }
 
     SnackbarHost(snackbar)

@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -259,19 +260,23 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
             }
 
             Spacer(Modifier.height(8.dp))
-            CfgSection(stringResource(R.string.led_section)) {
-                CfgSwitch(stringResource(R.string.led_control_active), ledsEn) { ledsEn = it }
-            }
-
             if (bleMode == 2 || apMode == 2) {
                 CfgSection(stringResource(R.string.erpm_title_label)) {
                     CfgNumber(stringResource(R.string.ble_auto_on_erpm), bleErpmOn) { bleErpmOn = it }
                 }
             }
 
+            CfgSection(stringResource(R.string.led_section)) {
+                CfgSwitch(stringResource(R.string.led_control_active), ledsEn) { ledsEn = it }
+            }
+
+            var showRestartConfirm by remember { mutableStateOf(false) }
             var showFactoryConfirm by remember { mutableStateOf(false) }
 
-            Spacer(Modifier.height(8.dp))
+            val restartTriggered = stringResource(R.string.restart_triggered)
+            val failed = stringResource(R.string.failed)
+
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = {
                     if (blePinEnabled && blePin.length != 6) {
@@ -307,24 +312,57 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                     }
                 },
                 enabled = !busy,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00BCD4), contentColor = Color.Black),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (busy) {
-                    CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(stringResource(R.string.save))
+                Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
             }
+            
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { showRestartConfirm = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE0A030), contentColor = Color.Black),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.restart), fontWeight = FontWeight.Bold)
+            }
+
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { showFactoryConfirm = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = Color.White),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(R.string.factory_reset))
+                Text(stringResource(R.string.factory_reset), fontWeight = FontWeight.Bold)
             }
+
             Spacer(Modifier.height(6.dp))
             Text(stringResource(R.string.save_reboot_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+
+            if (showRestartConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showRestartConfirm = false },
+                    title = { Text(stringResource(R.string.restart_bridge_q)) },
+                    text = { Text(stringResource(R.string.restart_bridge_msg)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showRestartConfirm = false
+                            vm.restart { ok ->
+                                scope.launch {
+                                    snackbar.showSnackbar(if (ok) restartTriggered else failed)
+                                }
+                            }
+                        }) { Text(stringResource(R.string.restart), color = MaterialTheme.colorScheme.error) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRestartConfirm = false }) { Text(stringResource(R.string.cancel)) }
+                    }
+                )
+            }
 
             if (showFactoryConfirm) {
                 AlertDialog(
