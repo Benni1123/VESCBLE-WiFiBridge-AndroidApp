@@ -53,6 +53,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _rebootProgress = MutableStateFlow<Float?>(null)
     val rebootProgress: StateFlow<Float?> = _rebootProgress.asStateFlow()
 
+    private val _debugMode = MutableStateFlow(false)
+    val debugMode: StateFlow<Boolean> = _debugMode.asStateFlow()
+
+    private val _uartLog = MutableStateFlow<List<String>>(emptyList())
+    val uartLog: StateFlow<List<String>> = _uartLog.asStateFlow()
+
+    private val _bridgeDebugFilter = MutableStateFlow(15)
+    val bridgeDebugFilter: StateFlow<Int> = _bridgeDebugFilter.asStateFlow()
+
     private val _appUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
     val appUpdateInfo: StateFlow<AppUpdateInfo?> = _appUpdateInfo.asStateFlow()
 
@@ -195,6 +204,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun onDeviceChanged() {
         if (isRebooting) return
+        setDebugMode(false)
         wifi.release()
         apTried = false
         searchCycles = 0
@@ -585,6 +595,77 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteDevice(id: String) { viewModelScope.launch { store.delete(id) } }
     fun selectDevice(id: String) {
         viewModelScope.launch { store.select(id) }
+    }
+
+    fun setDebugMode(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled) {
+                // 1. Auf dem Server aktivieren, OHNE den Filter zu senden (behält Server-Filter bei)
+                api()?.postDebug(true)
+                
+                // 2. Den jetzt aktiven Filter vom Server abrufen, um die UI-Buttons zu synchronisieren
+                val status = api()?.fetchDebugStatus()
+                if (status != null) {
+                    _bridgeDebugFilter.value = status.filter
+                }
+
+                _debugMode.value = true
+                startUartPolling()
+            } else {
+                _debugMode.value = false
+                stopUartPolling()
+                // Auf dem Server deaktivieren
+                api()?.postDebug(false)
+            }
+        }
+    }
+
+    private var uartPollJob: Job? = null
+    private fun startUartPolling() {
+        uartPollJob?.cancel()
+        uartPollJob = viewModelScope.launch {
+            while (true) {
+                loadUartLog()
+                delay(400.milliseconds)
+            }
+        }
+    }
+
+    private fun stopUartPolling() {
+        uartPollJob?.cancel()
+        uartPollJob = null
+    }
+
+    fun setBridgeDebugFilter(filter: Int) {
+        _bridgeDebugFilter.value = filter
+        if (_debugMode.value) {
+            viewModelScope.launch {
+                api()?.postDebug(true, filter)
+            }
+        }
+    }
+
+    fun loadBridgeDebugStatus() {
+        viewModelScope.launch {
+            val status = api()?.fetchDebugStatus()
+            if (status != null) {
+                _bridgeDebugFilter.value = status.filter
+            }
+        }
+    }
+
+    fun loadUartLog() {
+        viewModelScope.launch {
+            _uartLog.value = api()?.fetchUartLog() ?: emptyList()
+        }
+    }
+
+    fun clearUartLog() {
+        viewModelScope.launch {
+            if (api()?.clearUartLog() == true) {
+                _uartLog.value = emptyList()
+            }
+        }
     }
 
     fun factoryReset(onResult: (Boolean) -> Unit) {

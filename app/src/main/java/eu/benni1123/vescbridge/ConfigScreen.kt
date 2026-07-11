@@ -127,9 +127,11 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
             CfgSection(stringResource(R.string.access_point_section)) {
                 CfgText(stringResource(R.string.ap_ssid_label), apSsid) { apSsid = it }
                 CfgPassword(stringResource(R.string.ap_password_label), apPass) { apPass = it }
-                CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
-                CfgSwitch(stringResource(R.string.ap_wake_on_move_label), apMode == 2) { 
-                    apMode = if (it) 2 else 1 
+                CfgDropdown(stringResource(R.string.ap_mode), apMode,
+                    listOf("", stringResource(R.string.ap_on), stringResource(R.string.ap_auto)),
+                    startIndex = 1) { apMode = it }
+                if (apMode == 2) {
+                    CfgNumber(stringResource(R.string.ap_timeout_config), apTimeout) { apTimeout = it }
                 }
             }
             CfgSection(stringResource(R.string.ble_mode)) {

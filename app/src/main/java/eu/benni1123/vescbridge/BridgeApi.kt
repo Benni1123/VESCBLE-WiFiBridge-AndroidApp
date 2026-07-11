@@ -50,11 +50,19 @@ data class BridgeInfo(
     val txPin: Int,
     val ledsEnabled: Boolean = false,
     val allIps: List<String> = emptyList(),
+    // Boot-Diagnose
+    val resetReasonCode: Int = -1,
+    val resetReason: String = "",
+    val plannedRestart: String = "",
+    val resetBrownout: Boolean = false,
+    val resetPanic: Boolean = false,
+    val resetWatchdog: Boolean = false,
     // Diagnose-Daten
     val diagScans: Int = -1,
     val diagStaConn: Int = -1,
     val diagStaDisc: Int = -1,
     val diagDiscReason: Int = -1,
+    val diagDiscReasonName: String = "",
     val diagApConn: Int = -1,
     val diagApDisc: Int = -1,
     val diagWdFires: Int = -1,
@@ -71,6 +79,11 @@ data class BridgeUpdateStatus(
     val latest: String = "",
     val available: Boolean = false,
     val serverError: Boolean = false
+)
+
+data class BridgeDebugStatus(
+    val enabled: Boolean,
+    val filter: Int
 )
 
 // Kapselt alle HTTP-Aufrufe gegen eine Bridge.
@@ -129,10 +142,19 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 txPin         = if (o.has("tx_pin")) o.getInt("tx_pin") else -1,
                 ledsEnabled   = o.optBool("leds_enabled", o.optBool("leds", false)),
                 allIps        = ips.filter { it != "0.0.0.0" },
+                // Boot-Diagnose
+                resetReasonCode = o.optInt("reset_reason_code", -1),
+                resetReason    = o.optString("reset_reason", ""),
+                plannedRestart = o.optString("planned_restart", ""),
+                resetBrownout  = o.optBool("reset_brownout", false),
+                resetPanic     = o.optBool("reset_panic", false),
+                resetWatchdog  = o.optBool("reset_watchdog", false),
+                // Diagnose-Daten
                 diagScans     = if (o.has("diag_scans")) o.getInt("diag_scans") else -1,
                 diagStaConn   = if (o.has("diag_sta_conn")) o.getInt("diag_sta_conn") else -1,
                 diagStaDisc   = if (o.has("diag_sta_disc")) o.getInt("diag_sta_disc") else -1,
                 diagDiscReason = if (o.has("diag_disc_reason")) o.getInt("diag_disc_reason") else -1,
+                diagDiscReasonName = o.optString("diag_disc_reason_name", ""),
                 diagApConn    = if (o.has("diag_ap_conn")) o.getInt("diag_ap_conn") else -1,
                 diagApDisc    = if (o.has("diag_ap_disc")) o.getInt("diag_ap_disc") else -1,
                 diagWdFires   = if (o.has("diag_wd_fires")) o.getInt("diag_wd_fires") else -1,
@@ -155,6 +177,35 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
 
     suspend fun postConfig(jsonBody: String): Boolean = withContext(Dispatchers.IO) {
         try { withRetry { httpPostBody(jsonBody) } } catch (_: Exception) { false }
+    }
+
+    suspend fun postDebug(enabled: Boolean, filter: Int? = null): Boolean = withContext(Dispatchers.IO) {
+        val url = if (filter != null) {
+            "/api/debug?en=${if (enabled) 1 else 0}&filter=$filter"
+        } else {
+            "/api/debug?en=${if (enabled) 1 else 0}"
+        }
+        try { withRetry { httpPost(url) } } catch (_: Exception) { false }
+    }
+
+    suspend fun fetchDebugStatus(): BridgeDebugStatus? = withContext(Dispatchers.IO) {
+        try {
+            val json = withRetry { httpGet("/api/debug/status") }
+            val o = JSONObject(json)
+            BridgeDebugStatus(o.optBool("enabled", false), o.optInt("filter", 0))
+        } catch (_: Exception) { null }
+    }
+
+    suspend fun fetchUartLog(): List<String> = withContext(Dispatchers.IO) {
+        try {
+            val json = withRetry { httpGet("/api/uart/log") }
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    suspend fun clearUartLog(): Boolean = withContext(Dispatchers.IO) {
+        try { withRetry { httpPost("/api/uart/clear") } } catch (_: Exception) { false }
     }
 
     suspend fun scanWifi(): List<String> = withContext(Dispatchers.IO) {

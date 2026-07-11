@@ -84,6 +84,14 @@
     <string name="update_failed">Update fehlgeschlagen</string>
     <string name="no_device_selected_hint">Kein Gerät ausgewählt.\nÜber „Geräte“ eins hinzufügen.</string>
     <string name="bridge_default_name">Bridge</string>
+    <string name="debug_mode_enabled">Debug-Modus aktiviert</string>
+    <string name="debug_mode_disabled">Debug-Modus deaktiviert</string>
+    <string name="boot_diagnostics">Boot-Diagnose</string>
+    <string name="reset_reason">Reset-Grund</string>
+    <string name="planned_restart">Geplanter Neustart</string>
+    <string name="reset_brownout">Brownout erkannt</string>
+    <string name="reset_panic">Panic/Exception</string>
+    <string name="reset_watchdog">Watchdog ausgel\u00f6st</string>
 
     <!-- Config Screen Strings -->
     <string name="no_device_selected">Kein Ger\u00e4t ausgew\u00e4hlt.</string>
@@ -101,7 +109,7 @@
     <string name="access_point_section">Access Point</string>
     <string name="ap_ssid_label">AP-SSID</string>
     <string name="ap_password_label">AP-Passwort</string>
-    <string name="ap_timeout_config">AP-Timeout (s, 0=aus)</string>
+    <string name="ap_timeout_config">Inaktivit\u00e4ts-Timeout (s)</string>
     <string name="ap_wake_on_move_label">AP bei Bewegung wecken</string>
     <string name="vesc_uart_section">VESC / UART</string>
     <string name="rx_pin_label">RX-Pin</string>

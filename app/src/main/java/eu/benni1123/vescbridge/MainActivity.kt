@@ -206,7 +206,14 @@ fun DeviceSelectorBar(
     
     var showEspUpdateDialog by remember { mutableStateOf(false) }
     var showAppUpdateDialog by remember { mutableStateOf(false) }
-    
+
+    val debugMode by vm.debugMode.collectAsStateWithLifecycle()
+    var debugClickCount by remember { mutableIntStateOf(0) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val debugEnabledMsg = stringResource(R.string.debug_mode_enabled)
+    val debugDisabledMsg = stringResource(R.string.debug_mode_disabled)
+
     val dotColor = when (state) {
         ConnState.Online -> Color(0xFF4CAF50)
         ConnState.Searching, ConnState.ConnectingAp, ConnState.Rebooting -> MaterialTheme.colorScheme.primary
@@ -261,10 +268,26 @@ fun DeviceSelectorBar(
                 }
                 
                 Box {
-                    IconButton(onClick = { expandedSettings = true }) {
+                    IconButton(onClick = { 
+                        expandedSettings = true 
+                        debugClickCount++
+                        if (debugClickCount >= 7) {
+                            val next = !debugMode
+                            vm.setDebugMode(next)
+                            debugClickCount = 0
+                            scope.launch {
+                                snackbarHostState.showSnackbar(if (next) debugEnabledMsg else debugDisabledMsg)
+                            }
+                        }
+                    }) {
                         Icon(Icons.Filled.Settings, stringResource(R.string.manage_devices), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    DropdownMenu(expanded = expandedSettings, onDismissRequest = { expandedSettings = false }) {
+                    DropdownMenu(expanded = expandedSettings, onDismissRequest = { 
+                        expandedSettings = false
+                        // Reset count when menu is closed normally or dismissed? 
+                        // Actually, better to reset after some time or if click is slow.
+                        // But let's just keep it simple.
+                    }) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.nav_devices)) },
                             leadingIcon = { Icon(Icons.Filled.Dns, null) },
@@ -292,6 +315,7 @@ fun DeviceSelectorBar(
                 )
             }
         }
+        SnackbarHost(snackbarHostState)
     }
 
     if (showEspUpdateDialog) {
