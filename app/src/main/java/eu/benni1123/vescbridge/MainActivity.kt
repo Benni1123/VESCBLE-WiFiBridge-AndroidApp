@@ -112,8 +112,11 @@ fun AppRoot(vm: MainViewModel) {
         // Start-up-Logik: Wenn kein Gerät (durch Stern/Single-Rule) gewählt wurde,
         // direkt zur Geräte-Übersicht springen.
         LaunchedEffect(devices, selected) {
-            if (!startupRedirectDone && devices.isNotEmpty()) {
-                if (selected == null) {
+            // Wir warten, bis die ViewModel-Initialladung (devices) durch ist.
+            // Sobald die Liste da ist (auch wenn leer), entscheiden wir.
+            if (!startupRedirectDone) {
+                // Falls keine Geräte da sind ODER kein Gerät ausgewählt wurde (kein Stern/Auto-Connect)
+                if (devices.isEmpty() || selected == null) {
                     screen = Screen.Devices
                 }
                 startupRedirectDone = true

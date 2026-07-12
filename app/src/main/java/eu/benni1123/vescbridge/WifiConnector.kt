@@ -39,12 +39,15 @@ class WifiConnector(private val context: Context) {
     // Liefert das aktuelle WLAN-Netzwerk, falls das Handy in einem eingeloggt ist.
     // Hilft uns, die Bridge zu finden, wenn der User sich manuell verbunden hat.
     fun getCurrentWifiNetwork(): Network? {
-        @Suppress("DEPRECATION")
-        val networks = cm.allNetworks
-        return networks.firstOrNull { net ->
-            val caps = cm.getNetworkCapabilities(net)
-            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-        }
+        val active = cm.activeNetwork ?: return null
+        val caps = cm.getNetworkCapabilities(active)
+        return if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) active else null
+    }
+
+    fun getLocalIpAddress(): String? {
+        val net = getCurrentWifiNetwork() ?: return null
+        val lp = cm.getLinkProperties(net) ?: return null
+        return lp.linkAddresses.firstOrNull { it.address is Inet4Address }?.address?.hostAddress
     }
 
     // Ist das Handy aktuell in einem WLAN? Mobile Daten zaehlen bewusst NICHT.
@@ -139,8 +142,8 @@ class WifiConnector(private val context: Context) {
         }
 
         callback = cb
-        // Timeout auf 30s gesetzt (Standard), damit der Dialog Zeit hat
-        cm.requestNetwork(request, cb, 30000)
+        // Timeout auf 15s gesetzt, damit der User nicht zu lange im "Verbinde..." feststeckt
+        cm.requestNetwork(request, cb, 15000)
     }
 
     // Haelt die AP-Verbindung aktiv am Leben. Android neigt dazu, ein Netz OHNE

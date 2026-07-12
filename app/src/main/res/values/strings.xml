@@ -51,6 +51,7 @@
     <string name="app_up_to_date">Your app is up to date.</string>
     <string name="check_app_updates">Check for app updates</string>
     <string name="system">System</string>
+    <string name="system_time">System Time</string>
     <string name="uptime">Uptime</string>
     <string name="free_heap">Free heap</string>
     <string name="version">Version</string>
@@ -180,6 +181,7 @@
     <string name="sync_name_with_ble">Sync name with BLE</string>
     <string name="ip_addresses_hint">IP Addresses (App uses reachable one)</string>
     <string name="add_ip">Add IP</string>
+    <string name="scan_wifi_net">Scan WiFi Network</string>
     <string name="access_point_optional">Access Point (optional, for auto-connect without WiFi)</string>
     <string name="ap_ssid_hint">AP-SSID (WiFi name of the bridge)</string>
     <string name="ap_ip_tip">Tip: AP-IP is usually 192.168.9.1 \u2013 enter as IP as well.</string>

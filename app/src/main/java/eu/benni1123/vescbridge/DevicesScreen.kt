@@ -25,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 fun DevicesScreen(vm: MainViewModel) {
     val devices  by vm.devices.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
+    val discoveryResults by vm.discoveryResults.collectAsStateWithLifecycle()
+    val discoveryBusy by vm.discoveryBusy.collectAsStateWithLifecycle()
 
     var editDevice by remember { mutableStateOf<Device?>(null) }
     var showAdd by remember { mutableStateOf(false) }
@@ -81,7 +83,10 @@ fun DevicesScreen(vm: MainViewModel) {
                 )
                 showAdd = false
             },
-            onScanNearbySsids = { vm.getNearbySsids() }
+            onScanNearbySsids = { vm.getNearbySsids() },
+            discoveryResults = discoveryResults,
+            discoveryBusy = discoveryBusy,
+            onScanWifi = { vm.discoverBridges() }
         )
     }
     editDevice?.let { d ->
@@ -102,7 +107,10 @@ fun DevicesScreen(vm: MainViewModel) {
                 ))
                 editDevice = null
             },
-            onScanNearbySsids = { vm.getNearbySsids() }
+            onScanNearbySsids = { vm.getNearbySsids() },
+            discoveryResults = discoveryResults,
+            discoveryBusy = discoveryBusy,
+            onScanWifi = { vm.discoverBridges() }
         )
     }
 }
@@ -165,7 +173,10 @@ fun DeviceDialog(
     initial: Device?,
     onDismiss: () -> Unit,
     onSave: (String, List<String>, String, String, Boolean, Boolean, Int, Int, Boolean) -> Unit,
-    onScanNearbySsids: () -> List<String>
+    onScanNearbySsids: () -> List<String>,
+    discoveryResults: List<String>,
+    discoveryBusy: Boolean,
+    onScanWifi: () -> Unit
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var syncName by remember { mutableStateOf(initial?.syncName ?: true) }
@@ -184,8 +195,9 @@ fun DeviceDialog(
     var apPassword by remember { mutableStateOf(initial?.apPassword ?: "") }
     var showPw by remember { mutableStateOf(false) }
 
-    // Validierung: Name ist Pflicht, außer syncName ist aktiv. IP ist Pflicht, AUSSER apOnly ist aktiv.
-    val valid = (name.isNotBlank() || syncName) && (apOnly || hosts.any { it.isNotBlank() })
+    // Validierung: Name ist Pflicht, außer syncName ist aktiv. 
+    // IP ist Pflicht, AUSSER apOnly ist aktiv ODER eine AP-SSID wurde eingegeben.
+    val valid = (name.isNotBlank() || syncName) && (apOnly || hosts.any { it.isNotBlank() } || apSsid.isNotBlank())
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -205,8 +217,50 @@ fun DeviceDialog(
                     Text(stringResource(R.string.sync_name_with_ble), fontSize = 14.sp, modifier = Modifier.clickable { syncName = !syncName })
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.ip_addresses_hint),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.ip_addresses_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    
+                    if (discoveryBusy) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        TextButton(onClick = onScanWifi, contentPadding = PaddingValues(4.dp)) {
+                            Icon(Icons.Filled.Search, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.scan_wifi_net), fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                if (discoveryResults.isNotEmpty()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(Modifier.padding(8.dp)) {
+                            Text("Found in Network:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            discoveryResults.forEach { resIp ->
+                                Text(resIp, modifier = Modifier.fillMaxWidth().clickable {
+                                    if (!hosts.contains(resIp)) {
+                                        val emptyIdx = hosts.indexOfFirst { it.isBlank() }
+                                        if (emptyIdx != -1) {
+                                            // Wenn ein Feld leer ist (z.B. das erste beim Start), dieses füllen
+                                            hosts[emptyIdx] = resIp
+                                        } else if (hosts.size == 1) {
+                                            // Wenn nur ein Feld da ist (auch wenn gefüllt), dieses bei Klick ersetzen
+                                            // (verhindert das ungewollte Hinzufügen einer 2. IP bei Fehlklick)
+                                            hosts[0] = resIp
+                                        } else {
+                                            // Sonst neues Feld hinzufügen
+                                            hosts.add(resIp)
+                                        }
+                                    }
+                                }.padding(vertical = 4.dp), fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+
                 hosts.forEachIndexed { idx, value ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
@@ -253,21 +307,19 @@ fun DeviceDialog(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    if (showScanResults && nearbySsids.isNotEmpty()) {
-                        DropdownMenu(
-                            expanded = showScanResults,
-                            onDismissRequest = { showScanResults = false },
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            nearbySsids.forEach { ssid ->
-                                DropdownMenuItem(
-                                    text = { Text(ssid) },
-                                    onClick = {
-                                        apSsid = ssid
-                                        showScanResults = false
-                                    }
-                                )
-                            }
+                    DropdownMenu(
+                        expanded = showScanResults && nearbySsids.isNotEmpty(),
+                        onDismissRequest = { showScanResults = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        nearbySsids.forEach { ssid ->
+                            DropdownMenuItem(
+                                text = { Text(ssid) },
+                                onClick = {
+                                    apSsid = ssid
+                                    showScanResults = false
+                                }
+                            )
                         }
                     }
                 }

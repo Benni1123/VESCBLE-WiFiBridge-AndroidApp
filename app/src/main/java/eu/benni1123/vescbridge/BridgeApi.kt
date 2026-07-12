@@ -43,6 +43,8 @@ data class BridgeInfo(
     val vescFault: Int,
     val vescFaultStr: String,
     val uptime: String,
+    val time: String = "",
+    val timeSource: String = "",
     val heap: Long,
     val version: String,
     val port: Int,
@@ -84,6 +86,13 @@ data class BridgeUpdateStatus(
 data class BridgeDebugStatus(
     val enabled: Boolean,
     val filter: Int
+)
+
+data class BridgeTimeInfo(
+    val valid: Boolean,
+    val epoch: Long,
+    val source: String,
+    val formatted: String = ""
 )
 
 // Kapselt alle HTTP-Aufrufe gegen eine Bridge.
@@ -135,6 +144,8 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
                 vescFault     = if (o.has("vesc_fault")) o.getInt("vesc_fault") else -1,
                 vescFaultStr  = o.optString("vesc_fault_str", ""),
                 uptime        = o.optString("uptime", ""),
+                time          = o.optString("system_time", o.optString("time", "")),
+                timeSource    = o.optString("time_source", ""),
                 heap          = o.optLong("heap", 0),
                 version       = o.optString("build", ""),
                 port          = if (o.has("port")) o.getInt("port") else -1,
@@ -241,7 +252,7 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
     }
 
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
-        try { withRetry(retries = 0) { httpGet("/api/ping", timeout = 1000); true } } catch (_: Exception) { false }
+        try { withRetry(retries = 0) { httpGet("/api/info", timeout = 1500); true } } catch (_: Exception) { false }
     }
 
     suspend fun fetchUpdateStatus(): BridgeUpdateStatus = withContext(Dispatchers.IO) {
@@ -270,6 +281,29 @@ class BridgeApi(private val baseUrl: String, private val network: Network? = nul
 
     suspend fun installUpdate(): Boolean = withContext(Dispatchers.IO) {
         try { withRetry { httpPost("/api/update/install") } } catch (_: Exception) { false }
+    }
+
+    suspend fun fetchInfoRaw(timeout: Int = 1500): String = withContext(Dispatchers.IO) {
+        httpGet("/api/info", timeout = timeout)
+    }
+
+    suspend fun fetchTime(): BridgeTimeInfo? = withContext(Dispatchers.IO) {
+        try {
+            val json = withRetry { httpGet("/api/time") }
+            val o = JSONObject(json)
+            BridgeTimeInfo(
+                valid = o.optBool("valid", false),
+                epoch = o.optLong("epoch", 0L),
+                source = o.optString("source", "unknown"),
+                formatted = o.optString("formatted", "")
+            )
+        } catch (_: Exception) { null }
+    }
+
+    suspend fun postTime(epoch: Long): Boolean = withContext(Dispatchers.IO) {
+        try {
+            withRetry { httpPost("/api/time?epoch=$epoch&source=App&only_if_invalid=1") }
+        } catch (_: Exception) { false }
     }
 
     private fun httpGet(path: String, timeout: Int = 5000): String {

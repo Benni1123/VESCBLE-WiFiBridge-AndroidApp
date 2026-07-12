@@ -10,6 +10,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -46,6 +48,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _updateStatus = MutableStateFlow<BridgeUpdateStatus?>(null)
     val updateStatus: StateFlow<BridgeUpdateStatus?> = _updateStatus.asStateFlow()
+
+    private val _bridgeTime = MutableStateFlow<BridgeTimeInfo?>(null)
+    val bridgeTime: StateFlow<BridgeTimeInfo?> = _bridgeTime.asStateFlow()
+
+    private val _discoveryResults = MutableStateFlow<List<String>>(emptyList())
+    val discoveryResults: StateFlow<List<String>> = _discoveryResults.asStateFlow()
+
+    private val _discoveryBusy = MutableStateFlow(false)
+    val discoveryBusy: StateFlow<Boolean> = _discoveryBusy.asStateFlow()
 
     private val _updateBusy = MutableStateFlow(false)
     val updateBusy: StateFlow<Boolean> = _updateBusy.asStateFlow()
@@ -131,17 +142,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         // Selektions-Logik
         viewModelScope.launch {
-            // 1. Auf die erste Ladung der Geräteliste warten
-            val list = store.devices.filter { it.isNotEmpty() }.first()
+            // 1. Auf die erste Ladung der Geräteliste warten (auch wenn leer)
+            val list = store.devices.first()
 
             // 2. Den aktuell gespeicherten Favoriten (Stern) finden
             val starred = list.firstOrNull { it.autoConnect }
 
             // 3. Bestimmen, was am Start passieren soll
             val targetId = when {
-                list.size == 1 -> list.first().id
                 starred != null -> starred.id
-                else -> null // Mehrere Geräte, kein Stern -> Übersicht (null)
+                else -> null // Übersicht (null)
             }
 
             // 4. Den Store sofort überschreiben, falls er noch auf dem "letzten Gerät" steht
@@ -221,8 +231,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         var updatedDev = dev
         var needsUpdate = false
 
-        if (info.allIps.isNotEmpty()) {
-            val combinedHosts = (dev.hosts + info.allIps).distinct().filter { it.isNotBlank() && it != "0.0.0.0" }
+        val activeHost = _activeHost.value
+        val allPotentialIps = (info.allIps + (activeHost ?: "")).distinct()
+            .filter { it.isNotBlank() && it != "0.0.0.0" && it != "192.168.9.1" }
+
+        if (allPotentialIps.isNotEmpty()) {
+            val combinedHosts = (dev.hosts + allPotentialIps).distinct()
             if (combinedHosts.size != dev.hosts.size || !combinedHosts.containsAll(dev.hosts)) {
                 updatedDev = updatedDev.copy(hosts = combinedHosts)
                 needsUpdate = true
@@ -243,17 +257,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private suspend fun checkTimeSync() {
+        val a = api() ?: return
+        try {
+            val timeInfo = a.fetchTime()
+            _bridgeTime.value = timeInfo
+            
+            // Sync-Bedingung: Entweder explizit ungültig ODER Zeit ist offensichtlich Quatsch (nahe 1970)
+            val is1970 = timeInfo != null && timeInfo.epoch < 1000000000L // vor Jahr 2001
+            if (timeInfo != null && (!timeInfo.valid || is1970)) {
+                val now = System.currentTimeMillis()
+                val ok = a.postTime(now)
+                if (ok) {
+                    _bridgeTime.value = a.fetchTime()
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     private fun startSlowSync() {
         slowSyncJob?.cancel()
         slowSyncJob = viewModelScope.launch {
             while (true) {
-                delay(10000.milliseconds)
                 if (_state.value == ConnState.Online) {
                     loadConfig()
                     loadLedConfig()
                 } else {
                     break
                 }
+                delay(10000.milliseconds)
             }
         }
     }
@@ -370,8 +403,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                             checkSync(info, dev)
 
+                            // Jede Sekunde Zeit pollen, solange online
+                            checkTimeSync()
+
                             // Config & LED Sync alle 10s im Hintergrund starten, wenn neu online
-                            if (wasOffline) {
+                            if (wasOffline || slowSyncJob?.isActive != true) {
+                                if (wasOffline) _bridgeTime.value = null
                                 startSlowSync()
                             }
 
@@ -440,7 +477,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Auf LTE ohne Bindung finden wir lokal eh nix. Sofort null, um AP-Connect zu beschleunigen.
         if (!onWifi && bound == null) return@withContext null
 
-        val hosts = if (dev.apOnly) {
+        val hosts = if (dev.apOnly || dev.hosts.isEmpty()) {
             listOf("192.168.9.1")
         } else {
             (dev.hosts + "192.168.9.1").distinct().filter { it.isNotBlank() }
@@ -550,16 +587,38 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 restartPolling()
                 return@launch
             }
-            try { _info.value = a.fetchInfo(); _state.value = ConnState.Online }
+            try { 
+                _info.value = a.fetchInfo()
+                _state.value = ConnState.Online 
+                checkTimeSync()
+            }
             catch (_: Exception) { _activeHost.value = null }
         }
     }
 
-    fun disconnectAp() {
-        wifi.release()
-        _activeHost.value = null
-        apTried = false
-        restartPolling()
+    fun retryHome() {
+        viewModelScope.launch {
+            _activeHost.value = null
+            _state.value = ConnState.Searching
+            apTried = true // AP-Versuch erstmal hinten anstellen
+            searchCycles = 0
+            consecutiveFails = 0
+            wifi.release()
+            restartPolling()
+        }
+    }
+
+    fun retryAp() {
+        val dev = _selected.value ?: return
+        if (!dev.hasAp()) return
+        viewModelScope.launch {
+            _activeHost.value = null
+            _state.value = ConnState.Searching
+            apTried = false
+            searchCycles = 4 // Triggert sofort AP-Suche im Loop
+            consecutiveFails = 0
+            restartPolling()
+        }
     }
 
     fun addDevice(
@@ -641,15 +700,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (_debugMode.value) {
             viewModelScope.launch {
                 api()?.postDebug(true, filter)
-            }
-        }
-    }
-
-    fun loadBridgeDebugStatus() {
-        viewModelScope.launch {
-            val status = api()?.fetchDebugStatus()
-            if (status != null) {
-                _bridgeDebugFilter.value = status.filter
             }
         }
     }
@@ -737,6 +787,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun getNearbySsids(): List<String> = wifi.getNearbySsids()
 
+    fun discoverBridges() {
+        val localIp = wifi.getLocalIpAddress() ?: return
+        if (!localIp.contains(".")) return
+        
+        val prefix = localIp.substringBeforeLast(".")
+        val currentNet = wifi.getCurrentWifiNetwork()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _discoveryBusy.value = true
+            _discoveryResults.value = emptyList()
+            val found = mutableListOf<String>()
+            val semaphore = Semaphore(120) // Begrenzung, um Router/Handy nicht zu überlasten
+            
+            val jobs = (1..254).map { i ->
+                val host = "$prefix.$i"
+                if (host == localIp) return@map null
+                
+                launch {
+                    semaphore.withPermit {
+                        try {
+                            val api = BridgeApi("http://$host", currentNet)
+                            // 1500ms Timeout für Zuverlässigkeit bei hoher Last
+                            val json = api.fetchInfoRaw(1500)
+                            if (json.contains("vesc_connected") || json.contains("ble_connected") || json.contains("ap_timeout_remaining")) {
+                                synchronized(found) { found.add(host) }
+                                _discoveryResults.value = found.toList()
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+            jobs.filterNotNull().joinAll()
+            _discoveryBusy.value = false
+        }
+    }
+
     private val _ledThrottler = MutableSharedFlow<String>(
         replay = 0,
         extraBufferCapacity = 1,
@@ -779,7 +865,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _config.value = cfg
 
                 val staticIps = cfg.wifi.filter { it.static && it.ip.isNotBlank() }.map { it.ip }
-                val newHosts = (dev.hosts + staticIps).distinct().filter { it.isNotBlank() }
+                val newHosts = (dev.hosts + staticIps).distinct()
+                    .filter { it.isNotBlank() && it != "192.168.9.1" }
 
                 val needsUpdate = newHosts.size != dev.hosts.size ||
                         cfg.apSsid != dev.apSsid ||
@@ -809,7 +896,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
             if (ok) {
                 val staticIps = cfg.wifi.filter { it.static && it.ip.isNotBlank() }.map { it.ip }
-                val newHosts = (dev.hosts + staticIps).distinct().filter { it.isNotBlank() }
+                val newHosts = (dev.hosts + staticIps).distinct()
+                    .filter { it.isNotBlank() && it != "192.168.9.1" }
 
                 val updatedDev = dev.copy(
                     apSsid = cfg.apSsid,

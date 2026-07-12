@@ -16,6 +16,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.*
+
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun StatusScreen(vm: MainViewModel) {
@@ -26,6 +31,17 @@ fun StatusScreen(vm: MainViewModel) {
     val debugMode  by vm.debugMode.collectAsStateWithLifecycle()
     val uartLog    by vm.uartLog.collectAsStateWithLifecycle()
     val bridgeFilter by vm.bridgeDebugFilter.collectAsStateWithLifecycle()
+    val bridgeTime by vm.bridgeTime.collectAsStateWithLifecycle()
+
+    var showRetryTimeout by remember { mutableStateOf(false) }
+    LaunchedEffect(connState, info) {
+        if (info == null && (connState == ConnState.Searching || connState == ConnState.ConnectingAp)) {
+            delay(15000.milliseconds)
+            showRetryTimeout = true
+        } else {
+            showRetryTimeout = false
+        }
+    }
 
     LaunchedEffect(debugMode) {
         if (debugMode) {
@@ -64,6 +80,30 @@ fun StatusScreen(vm: MainViewModel) {
                         }
                         Text(msg, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    if (connState == ConnState.Offline || showRetryTimeout) {
+                        Spacer(Modifier.height(16.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (currentSelected.hosts.any { it != "192.168.9.1" }) {
+                                Button(
+                                    onClick = { vm.retryHome() },
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(stringResource(R.string.retry) + " (WiFi)", fontSize = 12.sp)
+                                }
+                            }
+                            if (currentSelected.hasAp()) {
+                                Button(
+                                    onClick = { vm.retryAp() },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(stringResource(R.string.retry) + " (AP)", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
                     if (connState == ConnState.ConnectingAp) {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -98,6 +138,37 @@ fun StatusScreen(vm: MainViewModel) {
                 val apStatusText = if (d.apActive) "Active (${d.apIp})" else "Off"
                 InfoRow(stringResource(R.string.access_point), apStatusText, if (d.apActive) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface)
 
+                val timeInfo = bridgeTime
+                val displayTime = if (timeInfo == null) {
+                    "..." 
+                } else if (timeInfo.formatted.isNotBlank()) {
+                    timeInfo.formatted
+                } else if (timeInfo.epoch > 0) {
+                    try {
+                        val epochMs = if (timeInfo.epoch < 100000000000L) timeInfo.epoch * 1000 else timeInfo.epoch
+                        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", locale)
+                        sdf.format(Date(epochMs))
+                    } catch (_: Exception) { "Format Error" }
+                } else {
+                    "0000-00-00 00:00:00"
+                }
+
+                val sourceStr = if (timeInfo == null) "" else {
+                    val rawSource = timeInfo.source.trim()
+                    when (rawSource.lowercase()) {
+                        "ntp" -> "NTP"
+                        "rtc" -> "RTC"
+                        "gps" -> "GPS"
+                        "api" -> "API"
+                        "app" -> "App"
+                        "unknown", "" -> if (timeInfo.valid) "" else "INVALID"
+                        else -> rawSource
+                    }
+                }
+                val timeVal = if (sourceStr.isNotBlank()) "$displayTime ($sourceStr)" else displayTime
+                val color = if (timeInfo != null && !timeInfo.valid) Color(0xFFF44336) else null
+                InfoRow(stringResource(R.string.system_time), timeVal, color)
+
                 InfoRow(stringResource(R.string.tcp_port), d.port.toString())
                 InfoRow("UART", "RX=GPIO${d.rxPin.toString().padStart(2, '0')} TX=GPIO${d.txPin.toString().padStart(2, '0')}")
             }
@@ -111,7 +182,7 @@ fun StatusScreen(vm: MainViewModel) {
                 InfoRow(stringResource(R.string.temp_motor), "%.0f \u00b0C".format(locale, d.vescTempMotor))
                 InfoRow(stringResource(R.string.error), d.vescFaultStr.ifEmpty { "OK" }, if (d.vescFault > 0) Color(0xFFF44336) else Color(0xFF4CAF50))
                 InfoRow(stringResource(R.string.erpm_label), d.vescErpm.toString())
-                
+
                 InfoRow(stringResource(R.string.uptime), d.uptime)
                 InfoRow("Build", d.version)
             }
