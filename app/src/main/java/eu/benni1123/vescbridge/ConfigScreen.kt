@@ -78,6 +78,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
     var bleMode by remember(k) { mutableStateOf(config.bleMode) }
     var blePinEnabled by remember(k) { mutableStateOf(config.blePinEnabled) }
     var blePin by remember(k) { mutableStateOf(config.blePin.toString().padStart(6, '0')) }
+    var bleFullPower by remember(k) { mutableStateOf(config.bleFullPower) }
     var bleErpmOn by remember(k) { mutableStateOf(config.bleAutoErpmOn.toString()) }
     var bleOffSec by remember(k) { mutableStateOf(config.bleAutoOffSec.toString()) }
     var apSsid  by remember(k) { mutableStateOf(config.apSsid) }
@@ -111,6 +112,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
     fun i(s: String, d: Int) = s.toIntOrNull() ?: d
 
     val savedRestarting = stringResource(R.string.saved_restarting)
+    val savedOnly = stringResource(R.string.saved)
     val saveFailed = stringResource(R.string.save_failed)
     val blePinError = stringResource(R.string.ble_pin_error)
 
@@ -123,6 +125,7 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                 if (blePinEnabled) {
                     CfgNumber(stringResource(R.string.ble_pin), blePin) { blePin = it.take(6) }
                 }
+                CfgSwitch(stringResource(R.string.ble_full_power), bleFullPower) { bleFullPower = it }
             }
             CfgSection(stringResource(R.string.access_point_section)) {
                 CfgText(stringResource(R.string.ap_ssid_label), apSsid) { apSsid = it }
@@ -299,16 +302,21 @@ private fun ConfigEditor(config: BridgeConfig, busy: Boolean, vm: MainViewModel)
                         bleMode = bleMode,
                         blePinEnabled = blePinEnabled,
                         blePin = i(blePin, 123456),
+                        bleFullPower = bleFullPower,
                         bleAutoErpmOn = i(bleErpmOn, 200),
                         bleAutoOffSec = i(bleOffSec, 120),
                         ledsEnabled = ledsEn, updateUrl = updateUrl, versionUrl = versionUrl,
                         wifi = wifiList.filter { it.ssid.isNotBlank() }.map { it.toWifiNet() }
                     )
-                    vm.saveConfig(newCfg, reboot = true) { ok ->
+
+                    // Reboot only if something OTHER than ledsEnabled changed
+                    val reboot = newCfg.copy(ledsEnabled = config.ledsEnabled) != config
+
+                    vm.saveConfig(newCfg, reboot = reboot) { ok ->
                         if (ok) vm.refreshNow() // Sofort nach Sync suchen
                         scope.launch {
                             snackbar.showSnackbar(
-                                if (ok) savedRestarting else saveFailed
+                                if (ok) (if (reboot) savedRestarting else savedOnly) else saveFailed
                             )
                         }
                     }

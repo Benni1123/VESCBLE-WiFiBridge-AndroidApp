@@ -102,6 +102,7 @@
     <string name="ble_section">BLE</string>
     <string name="ble_name_config">BLE-Name (sichtbar in VESC Tool)</string>
     <string name="ble_mode">BLE-Modus</string>
+    <string name="ble_full_power">BLE-Energiesparmodus deaktivieren (volle Leistung)</string>
     <string name="ble_auto_on_erpm">Auto-AN ab ERPM</string>
     <string name="ble_auto_off_sec_label">Auto-AUS nach (s)</string>
     <string name="ble_pin_enabled">PIN beim BLE-Koppeln verlangen</string>
@@ -146,6 +147,7 @@
     <string name="dns">DNS</string>
     <string name="add_wifi">WLAN hinzuf\u00fcgen</string>
     <string name="save">Speichern</string>
+    <string name="saved">Erfolgreich gespeichert</string>
     <string name="save_reboot_hint">Nach dem Speichern startet die Bridge neu. AP-SSID/Passwort werden auch im App-Ger\u00e4t aktualisiert.</string>
     <string name="saved_restarting">Gespeichert \u2013 Bridge startet neu</string>
     <string name="save_failed">Speichern fehlgeschlagen</string>
@@ -243,4 +245,14 @@
     <string name="meteor_rain">Meteor Schauer</string>
     <string name="hellfire">Höllenglut</string>
     <string name="uart_rx">UART RX</string>
+
+    <!-- Restart Reasons -->
+    <string name="reason_config_saved">Konfiguration gespeichert</string>
+    <string name="reason_manual_ota">Manuelles OTA-Update</string>
+    <string name="reason_server_ota">Server-OTA-Update</string>
+    <string name="reason_factory_reset">Factory Reset / NVS gelöscht</string>
+    <string name="reason_api_restart">API-Neustart</string>
+    <string name="reason_emergency_ota">Emergency-OTA auf Port 8080</string>
+    <string name="reason_auto_reboot">Auto-Reboot: kein Client verbunden</string>
+    <string name="reason_sw_restart">Software-Neustart</string>
 </resources>

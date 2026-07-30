@@ -47,6 +47,7 @@ data class BridgeConfig(
     val bleMode: Int = 1,
     val blePinEnabled: Boolean = false,
     val blePin: Int = 123456,
+    val bleFullPower: Boolean = false,
     val bleAutoErpmOn: Int = 200,
     val bleAutoOffSec: Int = 120,
     val ledsEnabled: Boolean = false,
@@ -93,6 +94,7 @@ data class BridgeConfig(
                 bleMode = if (o.has("ble_mode")) o.getInt("ble_mode") else if (o.has("bleMode")) o.getInt("bleMode") else 1,
                 blePinEnabled = o.optBool("ble_pin_enabled", false),
                 blePin = o.optInt("ble_pin", 123456),
+                bleFullPower = o.optBool("ble_full_power", false),
                 bleAutoErpmOn = o.optInt("ble_auto_erpm_on", 200),
                 bleAutoOffSec = o.optInt("ble_auto_off_sec", 120),
                 ledsEnabled = o.optBool("leds_enabled", false),
@@ -126,6 +128,7 @@ data class BridgeConfig(
         o.put("ble_mode", bleMode)
         o.put("ble_pin_enabled", blePinEnabled)
         o.put("ble_pin", blePin)
+        o.put("ble_full_power", bleFullPower)
         o.put("ble_auto_erpm_on", bleAutoErpmOn)
         o.put("ble_auto_off_sec", bleAutoOffSec)
         o.put("leds_enabled", ledsEnabled)

@@ -23,6 +23,21 @@ import java.util.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
+fun getLocalizedRestartReason(reason: String): String {
+    return when (reason) {
+        "Configuration saved" -> stringResource(R.string.reason_config_saved)
+        "Manual OTA update" -> stringResource(R.string.reason_manual_ota)
+        "Server OTA update" -> stringResource(R.string.reason_server_ota)
+        "Factory reset / NVS cleared" -> stringResource(R.string.reason_factory_reset)
+        "API restart" -> stringResource(R.string.reason_api_restart)
+        "Emergency OTA on port 8080" -> stringResource(R.string.reason_emergency_ota)
+        "Auto reboot: no client connected" -> stringResource(R.string.reason_auto_reboot)
+        "Software restart" -> stringResource(R.string.reason_sw_restart)
+        else -> reason
+    }
+}
+
+@Composable
 fun StatusScreen(vm: MainViewModel) {
     val locale     = LocalConfiguration.current.locales[0]
     val info       by vm.info.collectAsStateWithLifecycle()
@@ -191,7 +206,7 @@ fun StatusScreen(vm: MainViewModel) {
                 SectionCard(stringResource(R.string.boot_diagnostics).uppercase()) {
                     InfoRow(stringResource(R.string.reset_reason), "${d.resetReason} (${d.resetReasonCode})")
                     if (d.plannedRestart.isNotBlank()) {
-                        InfoRow(stringResource(R.string.planned_restart), d.plannedRestart)
+                        InfoRow(stringResource(R.string.planned_restart), getLocalizedRestartReason(d.plannedRestart))
                     }
                     if (d.resetBrownout) InfoRow(stringResource(R.string.reset_brownout), stringResource(R.string.yes), Color(0xFFF44336))
                     if (d.resetPanic) InfoRow(stringResource(R.string.reset_panic), stringResource(R.string.yes), Color(0xFFF44336))

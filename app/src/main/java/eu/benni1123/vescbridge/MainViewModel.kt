@@ -907,9 +907,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                 _selected.value = updatedDev
                 store.addOrUpdate(updatedDev)
-                prepareForReboot()
 
                 if (reboot) {
+                    prepareForReboot()
                     startRebootCountdown(10000L)
                 } else {
                     isRebooting = false
